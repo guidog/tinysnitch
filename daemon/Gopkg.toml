@@ -1,13 +1,5 @@
 [[constraint]]
-  name = "github.com/fsnotify/fsnotify"
-  branch = "master"
-
-[[constraint]]
   name = "github.com/google/gopacket"
-  branch = "master"
-
-[[constraint]]
-  name = "google.golang.org/grpc"
   branch = "master"
 
 [[constraint]]

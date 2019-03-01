@@ -22,10 +22,9 @@ func Exec(executable string, args []string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
 	raw, err := exec.Command(path, args...).CombinedOutput()
 	if err != nil {
-		fmt.Printf("ERROR: path=%s args=%s err=%s out='%s'\n", path, args, err, raw)
+		fmt.Printf("ERROR: path=%s args=%s err=%s out='%s'\n", path, args, err, Trim(string(raw)))
 		return "", err
 	} else {
 		return Trim(string(raw)), nil

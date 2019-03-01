@@ -3,9 +3,7 @@ package rule
 import (
 	"fmt"
 	"time"
-
 	"github.com/evilsocket/opensnitch/daemon/conman"
-	"github.com/evilsocket/opensnitch/daemon/ui/protocol"
 )
 
 type Action string
@@ -53,33 +51,4 @@ func (r *Rule) Match(con *conman.Connection) bool {
 		return false
 	}
 	return r.Operator.Match(con)
-}
-
-func Deserialize(reply *protocol.Rule) *Rule {
-	operator := NewOperator(
-		Type(reply.Operator.Type),
-		Operand(reply.Operator.Operand),
-		reply.Operator.Data,
-		make([]Operator, 0),
-	)
-
-	return Create(
-		reply.Name,
-		Action(reply.Action),
-		Duration(reply.Duration),
-		operator,
-	)
-}
-
-func (r *Rule) Serialize() *protocol.Rule {
-	return &protocol.Rule{
-		Name:     string(r.Name),
-		Action:   string(r.Action),
-		Duration: string(r.Duration),
-		Operator: &protocol.Operator{
-			Type:    string(r.Operator.Type),
-			Operand: string(r.Operator.Operand),
-			Data:    string(r.Operator.Data),
-		},
-	}
 }

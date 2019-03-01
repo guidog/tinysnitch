@@ -38,7 +38,6 @@ func RunRule(enable bool, rule []string) (err error) {
 	return
 }
 
-// INPUT --protocol udp --sport 53 -j NFQUEUE --queue-num 0 --queue-bypass
 func QueueDNSResponses(enable bool, queueNum int) (err error) {
 	// If enable, we're going to insert as #1, not append
 	if enable {
@@ -52,12 +51,10 @@ func QueueDNSResponses(enable bool, queueNum int) (err error) {
 			"--sport", "53",
 			"-j", "NFQUEUE",
 			"--queue-num", fmt.Sprintf("%d", queueNum),
-			"--queue-bypass",
+			// "--queue-bypass",
 		}
-		
 		lock.Lock()
 		defer lock.Unlock()
-		
 		_, err := core.Exec("iptables", rule)
 		if err != nil {
 			return err
@@ -66,10 +63,8 @@ func QueueDNSResponses(enable bool, queueNum int) (err error) {
 		if err != nil {
 			return err
 		}
-
 		return err
 	}
-
 	// Otherwise, it's going to be disable
 	return RunRule(enable, []string{
 		"INPUT",
@@ -77,11 +72,9 @@ func QueueDNSResponses(enable bool, queueNum int) (err error) {
 		"--sport", "53",
 		"-j", "NFQUEUE",
 		"--queue-num", fmt.Sprintf("%d", queueNum),
-		"--queue-bypass",
 	})
 }
 
-// OUTPUT -t mangle -m conntrack --ctstate NEW -j NFQUEUE --queue-num 0 --queue-bypass
 func QueueConnections(enable bool, queueNum int) (err error) {
 	return RunRule(enable, []string{
 		"OUTPUT",
@@ -90,7 +83,6 @@ func QueueConnections(enable bool, queueNum int) (err error) {
 		"--ctstate", "NEW",
 		"-j", "NFQUEUE",
 		"--queue-num", fmt.Sprintf("%d", queueNum),
-		"--queue-bypass",
 	})
 }
 

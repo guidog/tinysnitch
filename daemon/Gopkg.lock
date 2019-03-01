@@ -11,28 +11,6 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:b9414457752702c53f6afd3838da3d89b9513ada40cdbe9603bdf54b1ceb5014"
-  name = "github.com/fsnotify/fsnotify"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "ccc981bf80385c528a65fbfdd49bf2d8da22aa23"
-
-[[projects]]
-  digest = "1:239c4c7fd2159585454003d9be7207167970194216193a8a210b8d29576f19c9"
-  name = "github.com/golang/protobuf"
-  packages = [
-    "proto",
-    "ptypes",
-    "ptypes/any",
-    "ptypes/duration",
-    "ptypes/timestamp",
-  ]
-  pruneopts = "UT"
-  revision = "c823c79ea1570fb5ff454033735a8e68575d1d0f"
-  version = "v1.3.0"
-
-[[projects]]
-  branch = "master"
   digest = "1:66aa51f84ea09b487a5c86ed37c4795057c1ab96e801b59e1b1b298c0a4ee314"
   name = "github.com/google/gopacket"
   packages = [
@@ -42,111 +20,13 @@
   pruneopts = "UT"
   revision = "4772b23424e5e835a4157d125cc2f370e0f3a5f2"
 
-[[projects]]
-  branch = "master"
-  digest = "1:166293c9bbd7ee31d2fc8465823015ad49cf9949dfbbc55c26076ced4f054360"
-  name = "golang.org/x/net"
-  packages = [
-    "http/httpguts",
-    "http2",
-    "http2/hpack",
-    "idna",
-    "internal/timeseries",
-    "trace",
-  ]
-  pruneopts = "UT"
-  revision = "92fc7df08ae7536330f5a21328292abfa70520a8"
-
-[[projects]]
-  branch = "master"
-  digest = "1:a2bc6cb1f4e1d0b512e1d47d392ead580006b5bdade6ffde16271759fe609b34"
-  name = "golang.org/x/sys"
-  packages = ["unix"]
-  pruneopts = "UT"
-  revision = "a34e9553db1e492c9a76e60db2296ae7e5fbb772"
-
-[[projects]]
-  digest = "1:a2ab62866c75542dd18d2b069fec854577a20211d7c0ea6ae746072a1dccdd18"
-  name = "golang.org/x/text"
-  packages = [
-    "collate",
-    "collate/build",
-    "internal/colltab",
-    "internal/gen",
-    "internal/tag",
-    "internal/triegen",
-    "internal/ucd",
-    "language",
-    "secure/bidirule",
-    "transform",
-    "unicode/bidi",
-    "unicode/cldr",
-    "unicode/norm",
-    "unicode/rangetable",
-  ]
-  pruneopts = "UT"
-  revision = "f21a4dfb5e38f5895301dc265a8def02365cc3d0"
-  version = "v0.3.0"
-
-[[projects]]
-  branch = "master"
-  digest = "1:077c1c599507b3b3e9156d17d36e1e61928ee9b53a5b420f10f28ebd4a0b275c"
-  name = "google.golang.org/genproto"
-  packages = ["googleapis/rpc/status"]
-  pruneopts = "UT"
-  revision = "4f5b463f9597cbe0dd13a6a2cd4f85e788d27508"
-
-[[projects]]
-  branch = "master"
-  digest = "1:64aa71bb63032235b1f6b1385381e5d4133df5a6ce1a6a0422070f632681b73a"
-  name = "google.golang.org/grpc"
-  packages = [
-    ".",
-    "balancer",
-    "balancer/base",
-    "balancer/roundrobin",
-    "binarylog/grpc_binarylog_v1",
-    "codes",
-    "connectivity",
-    "credentials",
-    "credentials/internal",
-    "encoding",
-    "encoding/proto",
-    "grpclog",
-    "internal",
-    "internal/backoff",
-    "internal/binarylog",
-    "internal/channelz",
-    "internal/envconfig",
-    "internal/grpcrand",
-    "internal/grpcsync",
-    "internal/syscall",
-    "internal/transport",
-    "keepalive",
-    "metadata",
-    "naming",
-    "peer",
-    "resolver",
-    "resolver/dns",
-    "resolver/passthrough",
-    "stats",
-    "status",
-    "tap",
-  ]
-  pruneopts = "UT"
-  revision = "5878d965b2234619fe67d256d0cd582553e7fff1"
-
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
     "github.com/evilsocket/ftrace",
-    "github.com/fsnotify/fsnotify",
-    "github.com/golang/protobuf/proto",
     "github.com/google/gopacket",
     "github.com/google/gopacket/layers",
-    "google.golang.org/grpc",
-    "google.golang.org/grpc/connectivity",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1
