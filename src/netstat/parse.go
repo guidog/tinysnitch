@@ -4,13 +4,12 @@ import (
 	"bufio"
 	"encoding/binary"
 	"fmt"
+	"github.com/evilsocket/opensnitch/src/core"
+	"github.com/evilsocket/opensnitch/src/log"
 	"net"
 	"os"
 	"regexp"
 	"strconv"
-
-	"github.com/evilsocket/opensnitch/src/core"
-	"github.com/evilsocket/opensnitch/src/log"
 )
 
 var (
@@ -44,7 +43,6 @@ func hexToInt(h string) uint {
 	return uint(d)
 }
 
-
 func hexToInt2(h string) (uint, uint) {
 	if len(h) > 16 {
 		d, err := strconv.ParseUint(h[:16], 16, 64)
@@ -71,9 +69,9 @@ func hexToIP(h string) net.IP {
 	if m != 0 {
 		ip = make(net.IP, 16)
 		// TODO: Check if this depends on machine endianness?
-		binary.LittleEndian.PutUint32(ip, uint32(n >> 32))
+		binary.LittleEndian.PutUint32(ip, uint32(n>>32))
 		binary.LittleEndian.PutUint32(ip[4:], uint32(n))
-		binary.LittleEndian.PutUint32(ip[8:], uint32(m >> 32))
+		binary.LittleEndian.PutUint32(ip[8:], uint32(m>>32))
 		binary.LittleEndian.PutUint32(ip[12:], uint32(m))
 	} else {
 		ip = make(net.IP, 4)
@@ -89,7 +87,6 @@ func Parse(proto string) ([]Entry, error) {
 		return nil, err
 	}
 	defer fd.Close()
-
 	entries := make([]Entry, 0)
 	scanner := bufio.NewScanner(fd)
 	for lineno := 0; scanner.Scan(); lineno++ {
@@ -97,14 +94,12 @@ func Parse(proto string) ([]Entry, error) {
 		if lineno == 0 {
 			continue
 		}
-
 		line := core.Trim(scanner.Text())
 		m := parser.FindStringSubmatch(line)
 		if m == nil {
 			log.Warning("Could not parse netstat line from %s: %s", filename, line)
 			continue
 		}
-
 		entries = append(entries, NewEntry(
 			proto,
 			hexToIP(m[1]),
@@ -115,6 +110,5 @@ func Parse(proto string) ([]Entry, error) {
 			decToInt(m[6]),
 		))
 	}
-
 	return entries, nil
 }

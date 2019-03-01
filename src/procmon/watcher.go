@@ -1,11 +1,10 @@
 package procmon
 
 import (
+	"github.com/evilsocket/ftrace"
 	"io/ioutil"
 	"strconv"
 	"sync"
-
-	"github.com/evilsocket/ftrace"
 )
 
 const (
@@ -24,9 +23,7 @@ var (
 		"sched/sched_process_exec",
 		"sched/sched_process_exit",
 	}
-
 	watcher = ftrace.NewProbe(probeName, syscallName, subEvents)
-
 	index = make(map[int]*procData)
 	lock  = sync.RWMutex{}
 )
@@ -34,7 +31,6 @@ var (
 func forEachProcess(cb func(pid int, path string, args []string) bool) {
 	lock.RLock()
 	defer lock.RUnlock()
-
 	for pid, data := range index {
 		if cb(pid, data.path, data.args) == true {
 			break
@@ -53,7 +49,6 @@ func trackProcess(pid int) {
 func trackProcessArgs(e ftrace.Event) {
 	lock.Lock()
 	defer lock.Unlock()
-
 	if d, found := index[e.PID]; found == false {
 		index[e.PID] = &procData{
 			args: e.Argv(),
@@ -97,7 +92,6 @@ func eventConsumer() {
 func Start() (err error) {
 	// start from a clean state
 	watcher.Reset()
-
 	if err = watcher.Enable(); err == nil {
 		go eventConsumer()
 		// track running processes

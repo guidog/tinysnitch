@@ -15,7 +15,6 @@ import (
 	"sync"
 	"time"
 	"unsafe"
-
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 )

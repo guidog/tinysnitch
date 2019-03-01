@@ -3,7 +3,6 @@ package firewall
 import (
 	"fmt"
 	"sync"
-
 	"github.com/evilsocket/opensnitch/src/core"
 )
 
@@ -18,14 +17,9 @@ func RunRule(enable bool, rule []string) (err error) {
 	if enable == false {
 		action = "-D"
 	}
-
 	rule = append([]string{action}, rule...)
-
 	lock.Lock()
 	defer lock.Unlock()
-
-	// fmt.Printf("iptables %s\n", rule)
-
 	_, err = core.Exec("iptables", rule)
 	if err != nil {
 		return

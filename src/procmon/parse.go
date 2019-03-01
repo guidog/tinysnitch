@@ -2,17 +2,15 @@ package procmon
 
 import (
 	"fmt"
+	"github.com/evilsocket/opensnitch/src/core"
 	"io/ioutil"
 	"os"
 	"strings"
-
-	"github.com/evilsocket/opensnitch/src/core"
 )
 
 func GetPIDFromINode(inode int) int {
 	expect := fmt.Sprintf("socket:[%d]", inode)
 	found := -1
-
 	forEachProcess(func(pid int, path string, args []string) bool {
 		// for every descriptor
 		fdPath := fmt.Sprintf("/proc/%d/fd/", pid)
@@ -29,7 +27,6 @@ func GetPIDFromINode(inode int) int {
 		// keep looping
 		return false
 	})
-
 	return found
 }
 
@@ -40,7 +37,6 @@ func parseCmdLine(proc *Process) {
 				data[i] = byte(' ')
 			}
 		}
-
 		args := strings.Split(string(data), " ")
 		for _, arg := range args {
 			arg = core.Trim(arg)
@@ -69,13 +65,10 @@ func FindProcess(pid int) *Process {
 	if core.Exists(linkName) == false {
 		return nil
 	}
-
 	if link, err := os.Readlink(linkName); err == nil && core.Exists(link) == true {
 		proc := NewProcess(pid, link)
-
 		parseCmdLine(proc)
 		parseEnv(proc)
-
 		return proc
 	}
 	return nil
