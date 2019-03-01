@@ -3,7 +3,7 @@ package dns
 import (
 	"net"
 	"sync"
-	"github.com/evilsocket/opensnitch/daemon/log"
+	"github.com/evilsocket/opensnitch/log"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 )

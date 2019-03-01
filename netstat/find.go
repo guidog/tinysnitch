@@ -3,7 +3,7 @@ package netstat
 import (
 	"net"
 
-	"github.com/evilsocket/opensnitch/daemon/log"
+	"github.com/evilsocket/opensnitch/log"
 )
 
 func FindEntry(proto string, srcIP net.IP, srcPort uint, dstIP net.IP, dstPort uint) *Entry {

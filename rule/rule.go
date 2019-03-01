@@ -3,7 +3,7 @@ package rule
 import (
 	"fmt"
 	"time"
-	"github.com/evilsocket/opensnitch/daemon/conman"
+	"github.com/evilsocket/opensnitch/conman"
 )
 
 type Action string

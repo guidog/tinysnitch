@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/evilsocket/opensnitch/daemon/core"
+	"github.com/evilsocket/opensnitch/core"
 )
 
 const DropMark = 0x18BA5

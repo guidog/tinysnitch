@@ -5,9 +5,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/evilsocket/opensnitch/daemon/conman"
-	"github.com/evilsocket/opensnitch/daemon/core"
-	"github.com/evilsocket/opensnitch/daemon/log"
+	"github.com/evilsocket/opensnitch/conman"
+	"github.com/evilsocket/opensnitch/core"
+	"github.com/evilsocket/opensnitch/log"
 )
 
 type Type string
