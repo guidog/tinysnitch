@@ -2,11 +2,11 @@ package conman
 
 import (
 	"fmt"
-	"github.com/evilsocket/opensnitch/dns"
-	"github.com/evilsocket/opensnitch/log"
-	"github.com/evilsocket/opensnitch/netfilter"
-	"github.com/evilsocket/opensnitch/netstat"
-	"github.com/evilsocket/opensnitch/procmon"
+	"github.com/evilsocket/opensnitch/src/dns"
+	"github.com/evilsocket/opensnitch/src/log"
+	"github.com/evilsocket/opensnitch/src/netfilter"
+	"github.com/evilsocket/opensnitch/src/netstat"
+	"github.com/evilsocket/opensnitch/src/procmon"
 	"github.com/google/gopacket/layers"
 	"net"
 	"os"

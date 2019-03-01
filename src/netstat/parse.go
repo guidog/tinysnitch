@@ -9,8 +9,8 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/evilsocket/opensnitch/core"
-	"github.com/evilsocket/opensnitch/log"
+	"github.com/evilsocket/opensnitch/src/core"
+	"github.com/evilsocket/opensnitch/src/log"
 )
 
 var (
