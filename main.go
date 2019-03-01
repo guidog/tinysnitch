@@ -9,7 +9,6 @@ import (
 	"github.com/evilsocket/opensnitch/log"
 	"github.com/evilsocket/opensnitch/netfilter"
 	"github.com/evilsocket/opensnitch/procmon"
-	"github.com/evilsocket/opensnitch/rule"
 	"io/ioutil"
 	golog "log"
 	"os"
@@ -18,15 +17,12 @@ import (
 )
 
 var (
-	rulesPath        = "/etc/opensnitchd/rules"
-	noLiveReload     = false
 	setupFirewall    = false
 	teardownFirewall = false
 	queueNum         = 0
 	workers          = 1
 	noDebug          = false
 	err              = (error)(nil)
-	rules            = (*rule.Loader)(nil)
 	queue            = (*netfilter.Queue)(nil)
 	pktChan          = (<-chan netfilter.Packet)(nil)
 	wrkChan          = (chan netfilter.Packet)(nil)
@@ -61,7 +57,7 @@ func setupSignals() {
 		sig := <-sigChan
 		log.Raw("\n")
 		log.Important("Got signal: %v", sig)
-		cleanup()
+		procmon.Stop()
 		os.Exit(0)
 	}()
 }
@@ -76,26 +72,18 @@ func worker(id int) {
 	}
 }
 
-func setupWorkers() {
-	log.Debug("Starting %d workers ...", workers)
-	wrkChan = make(chan netfilter.Packet)
-	for i := 0; i < workers; i++ {
-		go worker(i)
-	}
-}
-
-func cleanup() {
-	log.Info("Cleaning up ...")
-	go procmon.Stop()
-}
-
 func firewallUp() {
 	log.Info("Firewall up ...")
-	if err = firewall.QueueDNSResponses(true, queueNum); err != nil {
+	err = firewall.QueueDNSResponses(true, queueNum)
+	if err != nil {
 		log.Fatal("Error while running DNS firewall rule: %s", err)
-	} else if err = firewall.QueueConnections(true, queueNum); err != nil {
+	}
+	err = firewall.QueueConnections(true, queueNum)
+	if err != nil {
 		log.Fatal("Error while running conntrack firewall rule: %s", err)
-	} else if err = firewall.DropMarked(true); err != nil {
+	}
+	err = firewall.DropMarked(true)
+	if err != nil {
 		log.Fatal("Error while running drop firewall rule: %s", err)
 	}
 }
@@ -108,29 +96,26 @@ func firewallDown() {
 }
 
 func onPacket(packet netfilter.Packet) {
-	// DNS response, just parse, track and accept.
 	if dns.TrackAnswers(packet.Packet) == true {
 		log.Info("dns tracked")
 		packet.SetVerdict(netfilter.NF_ACCEPT)
 		return
 	}
-	// Parse the connection state
 	con := conman.Parse(packet)
 	if con == nil {
-		// log.Error("this shouldnt happen anymore: %s", con)
+		// log.Error("what are these?: %s", packet.Packet)
 		packet.SetVerdict(netfilter.NF_ACCEPT)
 		return
 	}
-	_, err := core.Exec("notify", []string{
+	_, err = core.Exec("notify", []string{
 		"-f24",
 		"-l120",
 		con.String(),
 	})
 	if err != nil {
-		os.Exit(1)
+		log.Fatal("oh noes")
 	}
-	allow := true
-	if allow {
+	if true {
 		packet.SetVerdict(netfilter.NF_ACCEPT)
 		log.Debug("%s %s -> %s:%d", log.Bold(log.Green("✔")), log.Bold(con.Process.Path), log.Bold(con.To()), con.DstPort)
 	} else {
@@ -151,18 +136,11 @@ func main() {
 		if err := procmon.Start(); err != nil {
 			log.Fatal("%s", err)
 		}
-		rulesPath, err := core.ExpandPath(rulesPath)
-		if err != nil {
-			log.Fatal("%s", err)
+		log.Debug("Starting %d workers ...", workers)
+		wrkChan = make(chan netfilter.Packet)
+		for i := 0; i < workers; i++ {
+			go worker(i)
 		}
-		setupSignals()
-		log.Info("Loading rules from %s ...", rulesPath)
-		rules = rule.NewLoader()
-		err = rules.Load(rulesPath)
-		if err != nil {
-			log.Fatal("%s", err)
-		}
-		setupWorkers()
 		queue, err := netfilter.NewQueue(uint16(queueNum))
 		if err != nil {
 			log.Fatal("Error while creating queue #%d: %s", queueNum, err)

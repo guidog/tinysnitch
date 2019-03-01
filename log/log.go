@@ -5,7 +5,6 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"time"
 )
 
 type Handler func(format string, args ...interface{})
@@ -74,12 +73,11 @@ func Log(level int, format string, args ...interface{}) {
 		mutex.Lock()
 		defer mutex.Unlock()
 		label := labels[level]
-		when := time.Now().UTC().Format(DateFormat)
 		what := fmt.Sprintf(format, args...)
 		if strings.HasSuffix(what, "\n") == false {
 			what += "\n"
 		}
-		fmt.Fprintf(Output, "%s %s %s", when, label, what)
+		fmt.Fprintf(Output, "%s %s", label, what)
 	}
 }
 

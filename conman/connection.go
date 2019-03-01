@@ -28,20 +28,21 @@ func Parse(nfp netfilter.Packet) *Connection {
 	ipLayer := nfp.Packet.Layer(layers.LayerTypeIPv4)
 	ipLayer6 := nfp.Packet.Layer(layers.LayerTypeIPv6)
 	if ipLayer == nil && ipLayer6 == nil {
+		log.Info("nil i fifth %s", nfp)
 		return nil
 	}
 	if ipLayer == nil {
 		ip, ok := ipLayer6.(*layers.IPv6)
 		if ok == false || ip == nil {
+			log.Info("not ok %s", nfp)
 			return nil
 		}
-		// we're not interested in connections
-		// from/to the localhost interface
 		if ip.SrcIP.IsLoopback() {
+			// log.Info("loopy %s", nfp)
 			return nil
 		}
-		// skip multicast stuff
 		if ip.SrcIP.IsMulticast() || ip.DstIP.IsMulticast() {
+			// log.Info("multi %s", nfp)
 			return nil
 		}
 		con, err := NewConnection6(&nfp, ip)
@@ -49,28 +50,30 @@ func Parse(nfp netfilter.Packet) *Connection {
 			log.Debug("%s", err)
 			return nil
 		} else if con == nil {
+			log.Info("conless %s", nfp)
 			return nil
 		}
 		return con
 	} else {
 		ip, ok := ipLayer.(*layers.IPv4)
 		if ok == false || ip == nil {
+			log.Info("not ok ipv6 %s", nfp)
 			return nil
 		}
-		// we're not interested in connections
-		// from/to the localhost interface
 		if ip.SrcIP.IsLoopback() {
+			// log.Info("loopy ipv6 %s", nfp)
 			return nil
 		}
-		// skip multicast stuff
 		if ip.SrcIP.IsMulticast() || ip.DstIP.IsMulticast() {
+			// log.Info("multi ipv6 %s", nfp)
 			return nil
 		}
 		con, err := NewConnection(&nfp, ip)
 		if err != nil {
-			log.Debug("%s", err)
+			log.Debug("ipv6 %s", err)
 			return nil
 		} else if con == nil {
+			log.Info("conless ipv6 %s", nfp)
 			return nil
 		}
 		return con
