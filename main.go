@@ -2,13 +2,13 @@ package main
 
 import (
 	"flag"
-	"github.com/evilsocket/opensnitch/src/conman"
-	"github.com/evilsocket/opensnitch/src/core"
-	"github.com/evilsocket/opensnitch/src/dns"
-	"github.com/evilsocket/opensnitch/src/firewall"
-	"github.com/evilsocket/opensnitch/src/log"
-	"github.com/evilsocket/opensnitch/src/netfilter"
-	"github.com/evilsocket/opensnitch/src/procmon"
+	"github.com/evilsocket/opensnitch/conn"
+	"github.com/evilsocket/opensnitch/lib"
+	"github.com/evilsocket/opensnitch/dns"
+	"github.com/evilsocket/opensnitch/iptables"
+	"github.com/evilsocket/opensnitch/log"
+	"github.com/evilsocket/opensnitch/netfilter"
+	"github.com/evilsocket/opensnitch/procmon"
 	"io/ioutil"
 	golog "log"
 	"os"
@@ -74,15 +74,15 @@ func worker(id int) {
 
 func firewallUp() {
 	log.Info("Firewall up ...")
-	err = firewall.QueueDNSResponses(true, queueNum)
+	err = iptables.QueueDNSResponses(true, queueNum)
 	if err != nil {
 		log.Fatal("Error while running DNS firewall rule: %s", err)
 	}
-	err = firewall.QueueConnections(true, queueNum)
+	err = iptables.QueueConnections(true, queueNum)
 	if err != nil {
 		log.Fatal("Error while running conntrack firewall rule: %s", err)
 	}
-	err = firewall.DropMarked(true)
+	err = iptables.DropMarked(true)
 	if err != nil {
 		log.Fatal("Error while running drop firewall rule: %s", err)
 	}
@@ -90,9 +90,9 @@ func firewallUp() {
 
 func firewallDown() {
 	log.Info("Firewall up ...")
-	firewall.QueueDNSResponses(false, queueNum)
-	firewall.QueueConnections(false, queueNum)
-	firewall.DropMarked(false)
+	iptables.QueueDNSResponses(false, queueNum)
+	iptables.QueueConnections(false, queueNum)
+	iptables.DropMarked(false)
 }
 
 func onPacket(packet netfilter.Packet) {
@@ -101,13 +101,13 @@ func onPacket(packet netfilter.Packet) {
 		packet.SetVerdict(netfilter.NF_ACCEPT)
 		return
 	}
-	con := conman.Parse(packet)
+	con := conn.Parse(packet)
 	if con == nil {
 		// log.Error("what are these?: %s", packet.Packet)
 		packet.SetVerdict(netfilter.NF_ACCEPT)
 		return
 	}
-	_, err = core.Exec("notify", []string{
+	_, err = lib.Exec("notify", []string{
 		"-f24",
 		"-l120",
 		con.String(),
@@ -119,7 +119,7 @@ func onPacket(packet netfilter.Packet) {
 		packet.SetVerdict(netfilter.NF_ACCEPT)
 		log.Debug("%s %s -> %s:%d", log.Bold(log.Green("✔")), log.Bold(con.Process.Path), log.Bold(con.To()), con.DstPort)
 	} else {
-		packet.SetVerdictAndMark(netfilter.NF_DROP, firewall.DropMark)
+		packet.SetVerdictAndMark(netfilter.NF_DROP, iptables.DropMark)
 		log.Warning("%s %s -> %s:%d", log.Bold(log.Red("✘")), log.Bold(con.Process.Path), log.Bold(con.To()), con.DstPort)
 	}
 }
@@ -132,7 +132,6 @@ func main() {
 		firewallDown()
 	} else {
 		setupLogging()
-		log.Important("Starting %s v%s", core.Name, core.Version)
 		if err := procmon.Start(); err != nil {
 			log.Fatal("%s", err)
 		}

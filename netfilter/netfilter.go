@@ -5,36 +5,69 @@ package netfilter
 #cgo CFLAGS: -Wall -I/usr/include
 #cgo LDFLAGS: -L/usr/lib64/
 
-#include "queue.h"
+#include "netfilter.h"
 */
 import "C"
 
 import (
 	"fmt"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"os"
 	"sync"
 	"time"
 	"unsafe"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
 )
 
+type Verdict C.uint
+
+type VerdictContainer struct {
+	Verdict Verdict
+	Mark    uint32
+	Packet  []byte
+}
+
+type Packet struct {
+	Packet         gopacket.Packet
+	Mark           uint32
+	verdictChannel chan VerdictContainer
+}
+
+func (p *Packet) SetVerdict(v Verdict) {
+	p.verdictChannel <- VerdictContainer{Verdict: v, Packet: nil, Mark: 0}
+}
+
+func (p *Packet) SetVerdictAndMark(v Verdict, mark uint32) {
+	p.verdictChannel <- VerdictContainer{Verdict: v, Packet: nil, Mark: mark}
+}
+
+func (p *Packet) SetRequeueVerdict(newQueueId uint16) {
+	v := uint(NF_QUEUE)
+	q := (uint(newQueueId) << 16)
+	v = v | q
+	p.verdictChannel <- VerdictContainer{Verdict: Verdict(v), Packet: nil, Mark: 0}
+}
+
+func (p *Packet) SetVerdictWithPacket(v Verdict, packet []byte) {
+	p.verdictChannel <- VerdictContainer{Verdict: v, Packet: packet, Mark: 0}
+}
+
 const (
-	AF_INET  = 2
-	AF_INET6 = 10
-	NF_DROP   Verdict = 0
-	NF_ACCEPT Verdict = 1
-	NF_STOLEN Verdict = 2
-	NF_QUEUE  Verdict = 3
-	NF_REPEAT Verdict = 4
-	NF_STOP   Verdict = 5
-	NF_DEFAULT_QUEUE_SIZE  uint32 = 4096
-	NF_DEFAULT_PACKET_SIZE uint32 = 4096
+	AF_INET                        = 2
+	AF_INET6                       = 10
+	NF_DROP                Verdict = 0
+	NF_ACCEPT              Verdict = 1
+	NF_STOLEN              Verdict = 2
+	NF_QUEUE               Verdict = 3
+	NF_REPEAT              Verdict = 4
+	NF_STOP                Verdict = 5
+	NF_DEFAULT_QUEUE_SIZE  uint32  = 4096
+	NF_DEFAULT_PACKET_SIZE uint32  = 4096
 )
 
 var (
-	queueIndex     = make(map[uint32]*chan Packet, 0)
-	queueIndexLock = sync.RWMutex{}
+	queueIndex            = make(map[uint32]*chan Packet, 0)
+	queueIndexLock        = sync.RWMutex{}
 	gopacketDecodeOptions = gopacket.DecodeOptions{Lazy: true, NoCopy: true}
 )
 

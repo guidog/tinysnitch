@@ -1,9 +1,9 @@
-package firewall
+package iptables
 
 import (
 	"fmt"
 	"sync"
-	"github.com/evilsocket/opensnitch/src/core"
+	"github.com/evilsocket/opensnitch/lib"
 )
 
 const DropMark = 0x18BA5
@@ -20,11 +20,11 @@ func RunRule(enable bool, rule []string) (err error) {
 	rule = append([]string{action}, rule...)
 	lock.Lock()
 	defer lock.Unlock()
-	_, err = core.Exec("iptables", rule)
+	_, err = lib.Exec("iptables", rule)
 	if err != nil {
 		return
 	}
-	_, err = core.Exec("ip6tables", rule)
+	_, err = lib.Exec("ip6tables", rule)
 	if err != nil {
 		return
 	}
@@ -49,11 +49,11 @@ func QueueDNSResponses(enable bool, queueNum int) (err error) {
 		}
 		lock.Lock()
 		defer lock.Unlock()
-		_, err := core.Exec("iptables", rule)
+		_, err := lib.Exec("iptables", rule)
 		if err != nil {
 			return err
 		}
-		_, err = core.Exec("ip6tables", rule)
+		_, err = lib.Exec("ip6tables", rule)
 		if err != nil {
 			return err
 		}

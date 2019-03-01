@@ -4,13 +4,49 @@ import (
 	"bufio"
 	"encoding/binary"
 	"fmt"
-	"github.com/evilsocket/opensnitch/src/core"
-	"github.com/evilsocket/opensnitch/src/log"
+	"github.com/evilsocket/opensnitch/lib"
+	"github.com/evilsocket/opensnitch/log"
 	"net"
 	"os"
 	"regexp"
 	"strconv"
 )
+
+type Entry struct {
+	Proto   string
+	SrcIP   net.IP
+	SrcPort uint
+	DstIP   net.IP
+	DstPort uint
+	UserId  int
+	INode   int
+}
+
+func NewEntry(proto string, srcIP net.IP, srcPort uint, dstIP net.IP, dstPort uint, userId int, iNode int) Entry {
+	return Entry{
+		Proto:   proto,
+		SrcIP:   srcIP,
+		SrcPort: srcPort,
+		DstIP:   dstIP,
+		DstPort: dstPort,
+		UserId:  userId,
+		INode:   iNode,
+	}
+}
+
+func FindEntry(proto string, srcIP net.IP, srcPort uint, dstIP net.IP, dstPort uint) *Entry {
+	entries, err := Parse(proto)
+	if err != nil {
+		log.Warning("Error while searching for %s netstat entry: %s", proto, err)
+		return nil
+	}
+	for _, entry := range entries {
+		if srcIP.Equal(entry.SrcIP) && srcPort == entry.SrcPort && dstIP.Equal(entry.DstIP) && dstPort == entry.DstPort {
+			return &entry
+		}
+	}
+	return nil
+}
 
 var (
 	parser = regexp.MustCompile(`(?i)` +
@@ -94,7 +130,7 @@ func Parse(proto string) ([]Entry, error) {
 		if lineno == 0 {
 			continue
 		}
-		line := core.Trim(scanner.Text())
+		line := lib.Trim(scanner.Text())
 		m := parser.FindStringSubmatch(line)
 		if m == nil {
 			log.Warning("Could not parse netstat line from %s: %s", filename, line)
