@@ -3,9 +3,9 @@ package main
 import (
 	"flag"
 	"github.com/evilsocket/opensnitch/conn"
-	"github.com/evilsocket/opensnitch/lib"
 	"github.com/evilsocket/opensnitch/dns"
 	"github.com/evilsocket/opensnitch/iptables"
+	"github.com/evilsocket/opensnitch/lib"
 	"github.com/evilsocket/opensnitch/log"
 	"github.com/evilsocket/opensnitch/netfilter"
 	"github.com/evilsocket/opensnitch/procmon"
@@ -72,27 +72,26 @@ func worker(id int) {
 	}
 }
 
-func firewallUp() {
-	log.Info("Firewall up ...")
-	err = iptables.QueueDNSResponses(true, queueNum)
+func firewall(enable bool) {
+	fail := false
+	err = iptables.QueueDNSResponses(enable, queueNum)
 	if err != nil {
-		log.Fatal("Error while running DNS firewall rule: %s", err)
+		log.Error("Error while running DNS firewall rule: %s", err)
+		fail = true
 	}
-	err = iptables.QueueConnections(true, queueNum)
+	err = iptables.QueueConnections(enable, queueNum)
 	if err != nil {
-		log.Fatal("Error while running conntrack firewall rule: %s", err)
+		log.Error("Error while running conntrack firewall rule: %s", err)
+		fail = true
 	}
-	err = iptables.DropMarked(true)
+	err = iptables.DropMarked(enable)
 	if err != nil {
-		log.Fatal("Error while running drop firewall rule: %s", err)
+		log.Error("Error while running firewall rule: %s", err)
+		fail = true
 	}
-}
-
-func firewallDown() {
-	log.Info("Firewall up ...")
-	iptables.QueueDNSResponses(false, queueNum)
-	iptables.QueueConnections(false, queueNum)
-	iptables.DropMarked(false)
+	if fail {
+		os.Exit(1)
+	}
 }
 
 func onPacket(packet netfilter.Packet) {
@@ -127,9 +126,11 @@ func onPacket(packet netfilter.Packet) {
 func main() {
 	flag.Parse()
 	if setupFirewall {
-		firewallUp()
+		log.Info("firewall up")
+		firewall(true)
 	} else if teardownFirewall {
-		firewallDown()
+		log.Info("firewall down")
+		firewall(false)
 	} else {
 		setupLogging()
 		if err := procmon.Start(); err != nil {

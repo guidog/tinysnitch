@@ -3,7 +3,7 @@ all: opensnitchd
 deps:
 	dep ensure
 
-opensnitchd:
+opensnitchd: clean
 	go build -o opensnitchd .
 
 clean:
