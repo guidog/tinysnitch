@@ -27,21 +27,21 @@ func Parse(nfp netfilter.Packet) *Connection {
 	ipLayer := nfp.Packet.Layer(layers.LayerTypeIPv4)
 	ipLayer6 := nfp.Packet.Layer(layers.LayerTypeIPv6)
 	if ipLayer == nil && ipLayer6 == nil {
-		log.Info("nil i fifth %s", nfp)
+		log.Info("nil i fifth")
 		return nil
 	}
 	if ipLayer == nil {
 		ip, ok := ipLayer6.(*layers.IPv6)
 		if ok == false || ip == nil {
-			log.Info("not ok %s", nfp)
+			log.Info("not ok")
 			return nil
 		}
 		if ip.SrcIP.IsLoopback() {
-			// log.Info("loopy %s", nfp)
+			log.Info("loopy")
 			return nil
 		}
 		if ip.SrcIP.IsMulticast() || ip.DstIP.IsMulticast() {
-			// log.Info("multi %s", nfp)
+			log.Info("multi")
 			return nil
 		}
 		con := NewConnection6(&nfp, ip)
@@ -49,15 +49,15 @@ func Parse(nfp netfilter.Packet) *Connection {
 	} else {
 		ip, ok := ipLayer.(*layers.IPv4)
 		if ok == false || ip == nil {
-			log.Info("not ok ipv6 %s", nfp)
+			log.Info("not ok ipv6")
 			return nil
 		}
 		if ip.SrcIP.IsLoopback() {
-			// log.Info("loopy ipv6 %s", nfp)
+			log.Info("loopy ipv6")
 			return nil
 		}
 		if ip.SrcIP.IsMulticast() || ip.DstIP.IsMulticast() {
-			// log.Info("multi ipv6 %s", nfp)
+			log.Info("multi ipv6")
 			return nil
 		}
 		con := NewConnection(&nfp, ip)
@@ -69,6 +69,7 @@ func newConnectionImpl(nfp *netfilter.Packet, c *Connection) (cr *Connection) {
 	// no errors but not enough info neither
 	if !c.parseDirection() {
 		log.Error("failed to parse direction")
+		// return nil
 	}
 	// 1. lookup uid and inode using /proc/net/(udp|tcp)
 	// 2. lookup pid by inode
@@ -76,16 +77,18 @@ func newConnectionImpl(nfp *netfilter.Packet, c *Connection) (cr *Connection) {
 	// 4. lookup process info by pid
 	c.Entry = netstat.FindEntry(c.Protocol, c.SrcIP, c.SrcPort, c.DstIP, c.DstPort)
 	if c.Entry == nil {
-		log.Error("Could not find netstat entry for: %s", c.String())
-	} else {
-		pid := procmon.GetPIDFromINode(c.Entry.INode)
-		if pid == -1 {
-			log.Error("Could not find process id for: %s", c.String())
-		}
+		log.Error("Could not find netstat entry for: %s", c.SingleString())
+		return c
+	}
+	pid := procmon.GetPIDFromINode(c.Entry.INode)
+	if pid == -1 {
+		log.Error("Could not find process id for: %s", c.SingleString())
+		return c
 	}
 	c.Process = procmon.FindProcess(pid)
 	if c.Process == nil {
-		log.Error("Could not find process by its pid %d for: %s", pid, c.String())
+		log.Error("Could not find process by its pid %d for: %s", pid, c.SingleString())
+		return c
 	}
 	return c
 }
@@ -148,12 +151,21 @@ func (c *Connection) To() string {
 }
 
 func (c *Connection) String() string {
-	// if c.Entry == nil {
-	// 	return fmt.Sprintf("%s\n\n->\n\n%s %s:%d", c.SrcIP, c.Protocol, c.To(), c.DstPort)
-	// } else if c.Process == nil {
-	// 	return fmt.Sprintf("%s uid:%d\n\n->\n\n%s %s:%d", c.SrcIP, c.Entry.UserId, c.Protocol, c.To(), c.DstPort)
-	// } else {
-	// 	return fmt.Sprintf("%s pid:%d uid:%d\n\n->\n\n%s %s:%d", c.Process.Path, c.Process.ID, c.Entry.UserId, c.Protocol, c.To(), c.DstPort)
-	// }
-	return fmt.Sprintf("%s uid:%d pid:%d\n%s %s:%d", c.Process.Path, c.Entry.UserId, c.Process.ID, c.Protocol, c.To(), c.DstPort)
+	if c.Entry == nil {
+		return fmt.Sprintf("%s\n\n->\n\n%s %s:%d", c.SrcIP, c.Protocol, c.To(), c.DstPort)
+	} else if c.Process == nil {
+		return fmt.Sprintf("%s uid:%d\n\n->\n\n%s %s:%d", c.SrcIP, c.Entry.UserId, c.Protocol, c.To(), c.DstPort)
+	} else {
+		return fmt.Sprintf("%s pid:%d uid:%d\n\n->\n\n%s %s:%d", c.Process.Path, c.Process.ID, c.Entry.UserId, c.Protocol, c.To(), c.DstPort)
+	}
+}
+
+func (c *Connection) SingleString() string {
+	if c.Entry == nil {
+		return fmt.Sprintf("%s -> %s %s:%d", c.SrcIP, c.Protocol, c.To(), c.DstPort)
+	} else if c.Process == nil {
+		return fmt.Sprintf("%s uid:%d -> %s %s:%d", c.SrcIP, c.Entry.UserId, c.Protocol, c.To(), c.DstPort)
+	} else {
+		return fmt.Sprintf("%s pid:%d uid:%d -> %s %s:%d", c.Process.Path, c.Process.ID, c.Entry.UserId, c.Protocol, c.To(), c.DstPort)
+	}
 }

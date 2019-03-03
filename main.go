@@ -86,8 +86,8 @@ func firewall(enable bool) {
 func onPacket(packet netfilter.Packet) {
 	if dns.TrackAnswers(packet.Packet) {
 		log.Info("dns tracked")
-		packet.SetVerdict(netfilter.NF_ACCEPT)
-		return
+		// packet.SetVerdict(netfilter.NF_ACCEPT)
+		// return
 	}
 	con := conn.Parse(packet)
 	if con == nil {
@@ -101,10 +101,10 @@ func onPacket(packet netfilter.Packet) {
 	}
 	if true {
 		packet.SetVerdict(netfilter.NF_ACCEPT)
-		log.Debug("%s %s -> %s:%d", log.Bold(log.Green("✔")), log.Bold(con.Process.Path), log.Bold(con.To()), con.DstPort)
+		log.Info("allow: %s", con.SingleString())
 	} else {
 		packet.SetVerdictAndMark(netfilter.NF_DROP, iptables.DropMark)
-		log.Warning("%s %s -> %s:%d", log.Bold(log.Red("✘")), log.Bold(con.Process.Path), log.Bold(con.To()), con.DstPort)
+		log.Info("deny: %s", con.SingleString())
 	}
 }
 

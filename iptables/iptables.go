@@ -2,24 +2,17 @@ package iptables
 
 import (
 	"fmt"
-	"sync"
 	"github.com/evilsocket/opensnitch/lib"
 )
 
 const DropMark = 0x18BA5
 
-// make sure we don't mess with multiple rules
-// at the same time
-var lock = sync.Mutex{}
-
 func RunRule(enable bool, rule []string) (err error) {
-	action := "-A"
+	action := "-I"
 	if enable == false {
 		action = "-D"
 	}
 	rule = append([]string{action}, rule...)
-	lock.Lock()
-	defer lock.Unlock()
 	_, err = lib.Exec("iptables", rule)
 	if err != nil {
 		return
@@ -47,8 +40,6 @@ func QueueDNSResponses(enable bool, queueNum int) (err error) {
 			"--queue-num", fmt.Sprintf("%d", queueNum),
 			// "--queue-bypass",
 		}
-		lock.Lock()
-		defer lock.Unlock()
 		_, err := lib.Exec("iptables", rule)
 		if err != nil {
 			return err
@@ -70,7 +61,18 @@ func QueueDNSResponses(enable bool, queueNum int) (err error) {
 }
 
 func QueueConnections(enable bool, queueNum int) (err error) {
-	return RunRule(enable, []string{
+	err = RunRule(enable, []string{
+		"INPUT",
+		"-t", "mangle",
+		"-m", "conntrack",
+		"--ctstate", "NEW",
+		"-j", "NFQUEUE",
+		"--queue-num", fmt.Sprintf("%d", queueNum),
+	})
+	if err != nil {
+	    return err
+	}
+	err = RunRule(enable, []string{
 		"OUTPUT",
 		"-t", "mangle",
 		"-m", "conntrack",
@@ -78,6 +80,10 @@ func QueueConnections(enable bool, queueNum int) (err error) {
 		"-j", "NFQUEUE",
 		"--queue-num", fmt.Sprintf("%d", queueNum),
 	})
+	if err != nil {
+	    return err
+	}
+	return nil
 }
 
 func DropMarked(enable bool) (err error) {
