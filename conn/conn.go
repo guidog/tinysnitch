@@ -9,7 +9,6 @@ import (
 	"github.com/evilsocket/opensnitch/procmon"
 	"github.com/google/gopacket/layers"
 	"net"
-	"os"
 )
 
 type Connection struct {
@@ -45,14 +44,7 @@ func Parse(nfp netfilter.Packet) *Connection {
 			// log.Info("multi %s", nfp)
 			return nil
 		}
-		con, err := NewConnection6(&nfp, ip)
-		if err != nil {
-			log.Debug("%s", err)
-			return nil
-		} else if con == nil {
-			log.Info("conless %s", nfp)
-			return nil
-		}
+		con := NewConnection6(&nfp, ip)
 		return con
 	} else {
 		ip, ok := ipLayer.(*layers.IPv4)
@@ -68,22 +60,15 @@ func Parse(nfp netfilter.Packet) *Connection {
 			// log.Info("multi ipv6 %s", nfp)
 			return nil
 		}
-		con, err := NewConnection(&nfp, ip)
-		if err != nil {
-			log.Debug("ipv6 %s", err)
-			return nil
-		} else if con == nil {
-			log.Info("conless ipv6 %s", nfp)
-			return nil
-		}
+		con := NewConnection(&nfp, ip)
 		return con
 	}
 }
 
-func newConnectionImpl(nfp *netfilter.Packet, c *Connection) (cr *Connection, err error) {
+func newConnectionImpl(nfp *netfilter.Packet, c *Connection) (cr *Connection) {
 	// no errors but not enough info neither
-	if c.parseDirection() == false {
-		return nil, nil
+	if !c.parseDirection() {
+		log.Error("failed to parse direction")
 	}
 	// 1. lookup uid and inode using /proc/net/(udp|tcp)
 	// 2. lookup pid by inode
@@ -91,23 +76,20 @@ func newConnectionImpl(nfp *netfilter.Packet, c *Connection) (cr *Connection, er
 	// 4. lookup process info by pid
 	c.Entry = netstat.FindEntry(c.Protocol, c.SrcIP, c.SrcPort, c.DstIP, c.DstPort)
 	if c.Entry == nil {
-		return nil, fmt.Errorf("Could not find netstat entry for: %s", c)
+		log.Error("Could not find netstat entry for: %s", c.String())
 	}
 	pid := procmon.GetPIDFromINode(c.Entry.INode)
 	if pid == -1 {
-		return nil, fmt.Errorf("Could not find process id for: %s", c)
-	}
-	if pid == os.Getpid() {
-		return nil, nil
+		log.Error("Could not find process id for: %s", c.String())
 	}
 	c.Process = procmon.FindProcess(pid)
 	if c.Process == nil {
-		return nil, fmt.Errorf("Could not find process by its pid %d for: %s", pid, c)
+		log.Error("Could not find process by its pid %d for: %s", pid, c.String())
 	}
-	return c, nil
+	return c
 }
 
-func NewConnection(nfp *netfilter.Packet, ip *layers.IPv4) (c *Connection, err error) {
+func NewConnection(nfp *netfilter.Packet, ip *layers.IPv4) (c *Connection) {
 	c = &Connection{
 		SrcIP:   ip.SrcIP,
 		DstIP:   ip.DstIP,
@@ -117,7 +99,7 @@ func NewConnection(nfp *netfilter.Packet, ip *layers.IPv4) (c *Connection, err e
 	return newConnectionImpl(nfp, c)
 }
 
-func NewConnection6(nfp *netfilter.Packet, ip *layers.IPv6) (c *Connection, err error) {
+func NewConnection6(nfp *netfilter.Packet, ip *layers.IPv6) (c *Connection) {
 	c = &Connection{
 		SrcIP:   ip.SrcIP,
 		DstIP:   ip.DstIP,
@@ -167,9 +149,9 @@ func (c *Connection) To() string {
 func (c *Connection) String() string {
 	if c.Entry == nil {
 		return fmt.Sprintf("%s ->(%s)-> %s:%d", c.SrcIP, c.Protocol, c.To(), c.DstPort)
-	}
-	if c.Process == nil {
+	} else if c.Process == nil {
 		return fmt.Sprintf("%s (uid:%d) ->(%s)-> %s:%d", c.SrcIP, c.Entry.UserId, c.Protocol, c.To(), c.DstPort)
+	} else {
+		return fmt.Sprintf("%s (%d) -> %s:%d (%s uid:%d)", c.Process.Path, c.Process.ID, c.To(), c.DstPort, c.Protocol, c.Entry.UserId)
 	}
-	return fmt.Sprintf("%s (%d) -> %s:%d (proto:%s uid:%d)", c.Process.Path, c.Process.ID, c.To(), c.DstPort, c.Protocol, c.Entry.UserId)
 }

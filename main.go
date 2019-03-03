@@ -22,11 +22,7 @@ var (
 	queueNum         = 0
 	workers          = 1
 	noDebug          = false
-	err              = (error)(nil)
-	queue            = (*netfilter.Queue)(nil)
-	pktChan          = (<-chan netfilter.Packet)(nil)
 	wrkChan          = (chan netfilter.Packet)(nil)
-	sigChan          = (chan os.Signal)(nil)
 )
 
 func init() {
@@ -47,7 +43,7 @@ func setupLogging() {
 }
 
 func setupSignals() {
-	sigChan = make(chan os.Signal, 1)
+	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan,
 		syscall.SIGHUP,
 		syscall.SIGINT,
@@ -57,24 +53,17 @@ func setupSignals() {
 		sig := <-sigChan
 		log.Raw("\n")
 		log.Important("Got signal: %v", sig)
-		procmon.Stop()
+		err := procmon.Stop()
+		if err != nil {
+		    log.Fatal("failed to stop procmon")
+		}
 		os.Exit(0)
 	}()
 }
 
-func worker(id int) {
-	log.Debug("Worker #%d started.", id)
-	for true {
-		select {
-		case pkt := <-wrkChan:
-			onPacket(pkt)
-		}
-	}
-}
-
 func firewall(enable bool) {
 	fail := false
-	err = iptables.QueueDNSResponses(enable, queueNum)
+	err := iptables.QueueDNSResponses(enable, queueNum)
 	if err != nil {
 		log.Error("Error while running DNS firewall rule: %s", err)
 		fail = true
@@ -95,22 +84,18 @@ func firewall(enable bool) {
 }
 
 func onPacket(packet netfilter.Packet) {
-	if dns.TrackAnswers(packet.Packet) == true {
+	if dns.TrackAnswers(packet.Packet) {
 		log.Info("dns tracked")
 		packet.SetVerdict(netfilter.NF_ACCEPT)
 		return
 	}
 	con := conn.Parse(packet)
 	if con == nil {
-		// log.Error("what are these?: %s", packet.Packet)
+		log.Error("what are these?: %s", packet.Packet)
 		packet.SetVerdict(netfilter.NF_ACCEPT)
 		return
 	}
-	_, err = lib.Exec("notify", []string{
-		"-f24",
-		"-l120",
-		con.String(),
-	})
+	_, err := lib.Exec("notify", []string{"-f24", "-l120", con.String()})
 	if err != nil {
 		log.Fatal("oh noes")
 	}
@@ -123,6 +108,44 @@ func onPacket(packet netfilter.Packet) {
 	}
 }
 
+func worker(id int) {
+	for {
+		select {
+		case pkt := <-wrkChan:
+			onPacket(pkt)
+		}
+	}
+}
+
+func _main() {
+	setupLogging()
+	setupSignals()
+	if err := procmon.Start(); err != nil {
+		log.Fatal("%s", err)
+	}
+	log.Debug("Starting %d workers ...", workers)
+
+	wrkChan = make(chan netfilter.Packet)
+	for i := 0; i < workers; i++ {
+		log.Debug("Worker #%d started.", i)
+		go worker(i)
+	}
+
+	queue, err := netfilter.NewQueue(uint16(queueNum))
+	if err != nil {
+		log.Fatal("Error while creating queue #%d: %s", queueNum, err)
+	}
+
+	pktChan := queue.Packets()
+	log.Info("Running on netfilter queue #%d ...", queueNum)
+	for {
+		select {
+		case pkt := <- pktChan:
+			wrkChan <- pkt
+		}
+	}
+}
+
 func main() {
 	flag.Parse()
 	if setupFirewall {
@@ -132,26 +155,7 @@ func main() {
 		log.Info("firewall down")
 		firewall(false)
 	} else {
-		setupLogging()
-		if err := procmon.Start(); err != nil {
-			log.Fatal("%s", err)
-		}
-		log.Debug("Starting %d workers ...", workers)
-		wrkChan = make(chan netfilter.Packet)
-		for i := 0; i < workers; i++ {
-			go worker(i)
-		}
-		queue, err := netfilter.NewQueue(uint16(queueNum))
-		if err != nil {
-			log.Fatal("Error while creating queue #%d: %s", queueNum, err)
-		}
-		pktChan = queue.Packets()
-		log.Info("Running on netfilter queue #%d ...", queueNum)
-		for true {
-			select {
-			case pkt := <-pktChan:
-				wrkChan <- pkt
-			}
-		}
+		log.Info("start opensnitchd")
+		_main()
 	}
 }
