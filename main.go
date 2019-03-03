@@ -91,7 +91,7 @@ func onPacket(packet netfilter.Packet) {
 	}
 	con := conn.Parse(packet)
 	if con == nil {
-		log.Error("what are these?: %s", packet.Packet)
+		// log.Error("what are these?: %s", packet.Packet)
 		packet.SetVerdict(netfilter.NF_ACCEPT)
 		return
 	}

@@ -77,10 +77,11 @@ func newConnectionImpl(nfp *netfilter.Packet, c *Connection) (cr *Connection) {
 	c.Entry = netstat.FindEntry(c.Protocol, c.SrcIP, c.SrcPort, c.DstIP, c.DstPort)
 	if c.Entry == nil {
 		log.Error("Could not find netstat entry for: %s", c.String())
-	}
-	pid := procmon.GetPIDFromINode(c.Entry.INode)
-	if pid == -1 {
-		log.Error("Could not find process id for: %s", c.String())
+	} else {
+		pid := procmon.GetPIDFromINode(c.Entry.INode)
+		if pid == -1 {
+			log.Error("Could not find process id for: %s", c.String())
+		}
 	}
 	c.Process = procmon.FindProcess(pid)
 	if c.Process == nil {
@@ -147,11 +148,12 @@ func (c *Connection) To() string {
 }
 
 func (c *Connection) String() string {
-	if c.Entry == nil {
-		return fmt.Sprintf("%s ->(%s)-> %s:%d", c.SrcIP, c.Protocol, c.To(), c.DstPort)
-	} else if c.Process == nil {
-		return fmt.Sprintf("%s (uid:%d) ->(%s)-> %s:%d", c.SrcIP, c.Entry.UserId, c.Protocol, c.To(), c.DstPort)
-	} else {
-		return fmt.Sprintf("%s (%d) -> %s:%d (%s uid:%d)", c.Process.Path, c.Process.ID, c.To(), c.DstPort, c.Protocol, c.Entry.UserId)
-	}
+	// if c.Entry == nil {
+	// 	return fmt.Sprintf("%s\n\n->\n\n%s %s:%d", c.SrcIP, c.Protocol, c.To(), c.DstPort)
+	// } else if c.Process == nil {
+	// 	return fmt.Sprintf("%s uid:%d\n\n->\n\n%s %s:%d", c.SrcIP, c.Entry.UserId, c.Protocol, c.To(), c.DstPort)
+	// } else {
+	// 	return fmt.Sprintf("%s pid:%d uid:%d\n\n->\n\n%s %s:%d", c.Process.Path, c.Process.ID, c.Entry.UserId, c.Protocol, c.To(), c.DstPort)
+	// }
+	return fmt.Sprintf("%s uid:%d pid:%d\n%s %s:%d", c.Process.Path, c.Entry.UserId, c.Process.ID, c.Protocol, c.To(), c.DstPort)
 }
