@@ -16,34 +16,31 @@
 # program. If not, go to http://www.gnu.org/licenses/gpl.html
 # or write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-from scapy.all import DNSRR, DNS
+import scapy.layers.dns
 import logging
 
 hosts = {'127.0.0.1': 'localhost'}
 
+def parse_dns(packet):
+    ip = packet['IP']
+    udp = packet['UDP']
+    dns = packet['DNS']
+    if int(udp.dport) == 53:
+        qname = dns.qd.qname
+        yield ip.src, udp.sport, ip.dst, udp.dport, qname, None
+    # dns reply packet
+    elif int(udp.sport) == 53:
+        # dns DNSRR count (answer count)
+        for i in range(dns.ancount):
+            dnsrr = dns.an[i]
+            yield ip.src, udp.sport, ip.dst, udp.dport, dnsrr.rrname, dnsrr.rdata
+
 def add_response(packet):
-    if packet.haslayer(DNS) and packet.haslayer(DNSRR):
-        try:
-            a_count = packet[DNS].ancount
-            i = a_count + 4
-            while i > 4:
-                hostname = packet[0][i].rrname
-                address = packet[0][i].rdata
-                i -= 1
-                if hostname == b'.':
-                    continue
-                elif hostname.endswith(b'.'):
-                    hostname = hostname[:-1]
-                # for CNAME records
-                if address.endswith('.'):
-                    address = address[:-1]
-                logging.debug("Adding DNS response: %s => %s", address, hostname)  # noqa
-                hosts[address] = hostname.decode()
-        except Exception as e:
-            logging.debug("Error while parsing DNS response: %s" % e)
-        return True
-    else:
-        return False
+    if packet and packet.haslayer('UDP') and packet.haslayer('DNS'):
+        for _, _, _, _, name, addr in parse_dns(packet):
+            if addr:
+                logging.info(f'{addr} => {name}')
+                hosts[addr] = name
 
 def get_hostname(address):
     try:

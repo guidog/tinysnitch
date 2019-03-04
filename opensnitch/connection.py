@@ -20,13 +20,10 @@ from collections import namedtuple
 from socket import inet_ntoa
 from opensnitch import proc
 from opensnitch import dns
-from opensnitch import procmon
 from dpkt import ip
 
 Application = namedtuple('Application', ('pid', 'path', 'cmdline'))
 _Connection = namedtuple('Connection', (
-    'data',
-    'pkt',
     'src_addr',
     'dst_addr',
     'hostname',
@@ -61,5 +58,5 @@ def Connection(payload):
         app = Application(None, None, None)
     elif None not in (proto, src_addr, dst_addr):
         pid = proc.get_pid_by_connection(src_addr, src_port, dst_addr, dst_port, proto)
-        app = Application(pid, *proc._get_app_path_and_cmdline(procmon, pid))
-    return _Connection(data, pkt, src_addr, dst_addr, hostname, src_port, dst_port, proto, app)
+        app = Application(pid, *proc._get_app_path_and_cmdline(pid))
+    return _Connection(src_addr, dst_addr, hostname, src_port, dst_port, proto, app)

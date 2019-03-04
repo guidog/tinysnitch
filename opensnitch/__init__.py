@@ -17,14 +17,14 @@
 # or write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
+import argh
 import pprint
 import netfilterqueue
-import scapy.all
+import scapy.layers.inet
 import logging
 import prctl
 import opensnitch.connection
 import opensnitch.dns
-import opensnitch.procmon
 import subprocess
 
 iptables_rules = (
@@ -43,23 +43,25 @@ required_caps = ((prctl.CAP_NET_RAW, prctl.ALL_FLAGS, True),
 cc = lambda *a: subprocess.check_call(' '.join(map(str, a)), shell=True, executable='/bin/bash')
 
 def drop_packet(pkt, conn):
-    logging.info('Dropping %s from "%s %s"', conn, conn.app.path, conn.app.cmdline)
     pkt.set_mark(101285)
     pkt.drop()
 
-def pkt_callback(self, pkt):
+def pkt_callback(pkt):
     data = pkt.get_payload()
-    if opensnitch.dns.add_response(scapy.all.IP(data)):
-        pass
-        # pkt.accept()
-        # return
+    ip = scapy.layers.inet.IP(data)
+    opensnitch.dns.add_response(ip)
     conn = opensnitch.connection.Connection(data)
-    logging.info(pprint.pformat(conn))
-    pkt.accept()
-    drop_packet(pkt, conn)
+    if conn.src_addr == conn.dst_addr == '127.0.0.1':
+        pkt.accept()
+    elif True:
+        logging.info('allow %s"', conn)
+        pkt.accept()
+    else:
+        logging.info('deny %s"', conn)
+        drop_packet(pkt, conn)
 
-def main(setup_firewall=False, teardown_firewall=False):
-    logging.BasicConfig(level='DEBUG', format='%(message)s')
+def _main(setup_firewall=False, teardown_firewall=False):
+    logging.basicConfig(level='DEBUG', format='%(message)s')
     if setup_firewall:
         for rule in iptables_rules:
             cc('iptables -I', rule)
@@ -67,13 +69,15 @@ def main(setup_firewall=False, teardown_firewall=False):
         for rule in iptables_rules:
             cc('iptables -D', rule, '|| echo failed to delete:', rule)
     else:
-        prctl.set_keepcaps(True)
-        prctl.set_caps(*required_caps)
-        opensnitch.procmon.start()
+        # prctl.set_keepcaps(True)
+        # prctl.set_caps(*required_caps)
         q = netfilterqueue.NetfilterQueue()
         q.bind(0, pkt_callback, 1024 * 4)
         try:
             q.run()
         finally:
             q.unbind()
-            opensnitch.procmon.stop()
+
+
+def main():
+    argh.dispatch_command(_main)

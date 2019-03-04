@@ -36,26 +36,17 @@ def get_pid_by_connection(src_addr, src_p, dst_addr, dst_p, proto='tcp'):
         return conn.pid
     logging.warning("Could not find process for %s connection %s:%s -> %s:%s", proto, src_addr, src_p, dst_addr, dst_p)
 
-def _get_app_path_and_cmdline(procmon, pid):
+def _get_app_path_and_cmdline(pid):
     path, args = None, None
-    if pid is None:
-        return (path, args)
-    pmr = procmon.get_app(pid)
-    if pmr:
-        path = pmr.get('filename')
-        args = pmr.get('args')
-    if not path:
-        logging.debug("Could not find pid %s with ProcMon, falling back to /proc/%s/exe -> %s", pid, pid, path or '?')  # noqa
-        try:
-            path = os.readlink("/proc/{}/exe".format(pid))
-        except Exception as e:
-            logging.exception(e)
-    if not args:
-        logging.debug(
-            "Could not find pid %s command line with ProcMon", pid)  # noqa
-        try:
-            with open("/proc/{}/cmdline".format(pid)) as cmd_fd:
-                cmd_fd.read().replace('\0', ' ').strip()
-        except Exception as e:
-            logging.exception(e)
-    return (path, args)
+    if not pid:
+        return path, args
+    try:
+        path = os.readlink(f"/proc/{pid}/exe")
+    except:
+        logging.exception('proc lookup failed')
+    try:
+        with open(f"/proc/{pid}/cmdline") as cmd_fd:
+            cmd_fd.read().replace('\0', ' ').strip()
+    except:
+        logging.exception('failed cmdline lookup')
+    return path, args
