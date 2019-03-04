@@ -19,12 +19,12 @@
 from collections import namedtuple
 from socket import inet_ntoa
 from opensnitch import proc
+from opensnitch import dns
+from opensnitch import procmon
 from dpkt import ip
-
 
 Application = namedtuple('Application', ('pid', 'path', 'cmdline'))
 _Connection = namedtuple('Connection', (
-    'id',
     'data',
     'pkt',
     'src_addr',
@@ -35,8 +35,7 @@ _Connection = namedtuple('Connection', (
     'proto',
     'app'))
 
-
-def Connection(procmon, dns, packet_id, payload):
+def Connection(payload):
     data = payload
     pkt = ip.IP(data)
     src_addr = inet_ntoa(pkt.src)
@@ -46,7 +45,6 @@ def Connection(procmon, dns, packet_id, payload):
     dst_port = None
     proto = None
     app = None
-
     if pkt.p == ip.IP_PROTO_TCP:
         proto = 'tcp'
         src_port = pkt.tcp.sport
@@ -59,27 +57,9 @@ def Connection(procmon, dns, packet_id, payload):
         proto = 'icmp'
         src_port = None
         dst_port = None
-
     if proto == 'icmp':
         app = Application(None, None, None)
-
     elif None not in (proto, src_addr, dst_addr):
-        pid = proc.get_pid_by_connection(src_addr,
-                                         src_port,
-                                         dst_addr,
-                                         dst_port,
-                                         proto)
-        app = Application(
-            pid, *proc._get_app_path_and_cmdline(procmon, pid))
-
-    return _Connection(
-        packet_id,
-        data,
-        pkt,
-        src_addr,
-        dst_addr,
-        hostname,
-        src_port,
-        dst_port,
-        proto,
-        app)
+        pid = proc.get_pid_by_connection(src_addr, src_port, dst_addr, dst_port, proto)
+        app = Application(pid, *proc._get_app_path_and_cmdline(procmon, pid))
+    return _Connection(data, pkt, src_addr, dst_addr, hostname, src_port, dst_port, proto, app)

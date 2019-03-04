@@ -20,7 +20,6 @@ import logging
 import psutil
 import os
 
-
 def get_pid_by_connection(src_addr, src_p, dst_addr, dst_p, proto='tcp'):
     # We always take the first element as we assume it contains only one
     # It should not be possible to keep two connections which are the same.
@@ -28,52 +27,35 @@ def get_pid_by_connection(src_addr, src_p, dst_addr, dst_p, proto='tcp'):
         if proto == 'tcp':
             if conn.laddr != (src_addr, int(src_p)):
                 continue
-
             if conn.raddr != (dst_addr, int(dst_p)):
                 continue
-
         # UDP gives us a very limited dataset to work with
         elif proto == 'udp':
             if conn.laddr[1] != int(src_p):
                 continue
-
         return conn.pid
-
-    logging.warning("Could not find process for %s connection %s:%s -> %s:%s",
-                    proto,
-                    src_addr,
-                    src_p,
-                    dst_addr,
-                    dst_p)
-
-    return None
-
+    logging.warning("Could not find process for %s connection %s:%s -> %s:%s", proto, src_addr, src_p, dst_addr, dst_p)
 
 def _get_app_path_and_cmdline(procmon, pid):
     path, args = None, None
     if pid is None:
         return (path, args)
-
     pmr = procmon.get_app(pid)
     if pmr:
         path = pmr.get('filename')
         args = pmr.get('args')
-
     if not path:
         logging.debug("Could not find pid %s with ProcMon, falling back to /proc/%s/exe -> %s", pid, pid, path or '?')  # noqa
         try:
             path = os.readlink("/proc/{}/exe".format(pid))
         except Exception as e:
             logging.exception(e)
-
     if not args:
         logging.debug(
             "Could not find pid %s command line with ProcMon", pid)  # noqa
-
         try:
             with open("/proc/{}/cmdline".format(pid)) as cmd_fd:
                 cmd_fd.read().replace('\0', ' ').strip()
         except Exception as e:
             logging.exception(e)
-
     return (path, args)

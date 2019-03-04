@@ -17,48 +17,37 @@
 # or write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 from scapy.all import DNSRR, DNS
-from threading import Lock
 import logging
 
+hosts = {'127.0.0.1': 'localhost'}
 
-class DNSCollector:
-    def __init__(self):
-        self.lock = Lock()
-        self.hosts = {'127.0.0.1': 'localhost'}
-
-    def add_response(self, packet):
-        if packet.haslayer(DNS) and packet.haslayer(DNSRR):
-            with self.lock:
-                try:
-                    a_count = packet[DNS].ancount
-                    i = a_count + 4
-                    while i > 4:
-                        hostname = packet[0][i].rrname
-                        address = packet[0][i].rdata
-                        i -= 1
-
-                        if hostname == b'.':
-                            continue
-
-                        elif hostname.endswith(b'.'):
-                            hostname = hostname[:-1]
-
-                        # for CNAME records
-                        if address.endswith('.'):
-                            address = address[:-1]
-
-                        logging.debug("Adding DNS response: %s => %s", address, hostname)  # noqa
-                        self.hosts[address] = hostname.decode()
-                except Exception as e:
-                    logging.debug("Error while parsing DNS response: %s" % e)
-
-            return True
-        else:
-            return False
-
-    def get_hostname(self, address):
+def add_response(packet):
+    if packet.haslayer(DNS) and packet.haslayer(DNSRR):
         try:
-            return self.hosts[address]
-        except KeyError:
-            logging.debug("No hostname found for address %s" % address)
-            return address
+            a_count = packet[DNS].ancount
+            i = a_count + 4
+            while i > 4:
+                hostname = packet[0][i].rrname
+                address = packet[0][i].rdata
+                i -= 1
+                if hostname == b'.':
+                    continue
+                elif hostname.endswith(b'.'):
+                    hostname = hostname[:-1]
+                # for CNAME records
+                if address.endswith('.'):
+                    address = address[:-1]
+                logging.debug("Adding DNS response: %s => %s", address, hostname)  # noqa
+                hosts[address] = hostname.decode()
+        except Exception as e:
+            logging.debug("Error while parsing DNS response: %s" % e)
+        return True
+    else:
+        return False
+
+def get_hostname(address):
+    try:
+        return hosts[address]
+    except KeyError:
+        logging.debug("No hostname found for address %s" % address)
+        return address
