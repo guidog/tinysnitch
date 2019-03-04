@@ -18,7 +18,6 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
 import argh
-import pprint
 import netfilterqueue
 import scapy.layers.inet
 import logging
@@ -69,15 +68,12 @@ def _main(setup_firewall=False, teardown_firewall=False):
         for rule in iptables_rules:
             cc('iptables -D', rule, '|| echo failed to delete:', rule)
     else:
-        # prctl.set_keepcaps(True)
-        # prctl.set_caps(*required_caps)
         q = netfilterqueue.NetfilterQueue()
         q.bind(0, pkt_callback, 1024 * 4)
         try:
             q.run()
         finally:
             q.unbind()
-
 
 def main():
     argh.dispatch_command(_main)

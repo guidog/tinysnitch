@@ -23,14 +23,7 @@ from opensnitch import dns
 from dpkt import ip
 
 Application = namedtuple('Application', ('pid', 'path', 'cmdline'))
-_Connection = namedtuple('Connection', (
-    'src_addr',
-    'dst_addr',
-    'hostname',
-    'src_port',
-    'dst_port',
-    'proto',
-    'app'))
+_Connection = namedtuple('Connection', ('src_addr', 'dst_addr', 'hostname', 'src_port', 'dst_port', 'proto', 'app'))
 
 def Connection(payload):
     data = payload
