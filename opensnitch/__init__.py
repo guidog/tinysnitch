@@ -42,18 +42,19 @@ def drop_packet(pkt, conn):
 def pkt_callback(pkt):
     data = pkt.get_payload()
     opensnitch.dns.add_response(data)
-    conn = opensnitch.connection.Connection(data)
-    if conn.src_addr == conn.dst_addr == '127.0.0.1':
+    conn = opensnitch.connection.parse(data)
+    if conn['src'] == conn['dst'] == '127.0.0.1':
         pkt.accept()
     elif True:
-        logging.info('allow %s"', conn)
+        logging.info('allow %s"', opensnitch.connection.format(conn))
         pkt.accept()
     else:
-        logging.info('deny %s"', conn)
+        logging.info('deny %s"', opensnitch.connection.format(conn))
         drop_packet(pkt, conn)
 
 def _main(setup_firewall=False, teardown_firewall=False):
-    logging.basicConfig(level='DEBUG', format='%(message)s')
+    logging.basicConfig(level='INFO', format='%(message)s')
+    opensnitch.dns.populate_localhosts()
     if setup_firewall:
         for rule in iptables_rules:
             cc('iptables -I', rule)

@@ -16,40 +16,36 @@
 # program. If not, go to http://www.gnu.org/licenses/gpl.html
 # or write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-from collections import namedtuple
-from socket import inet_ntoa
-from opensnitch import proc
-from opensnitch import dns
-from dpkt import ip
 
-Application = namedtuple('Application', ('pid', 'path', 'cmdline'))
-_Connection = namedtuple('Connection', ('src_addr', 'dst_addr', 'hostname', 'src_port', 'dst_port', 'proto', 'app'))
+import socket
+import opensnitch.proc
+import opensnitch.dns
+import dpkt.ip
 
-def Connection(payload):
+def parse(payload):
     data = payload
-    pkt = ip.IP(data)
-    src_addr = inet_ntoa(pkt.src)
-    dst_addr = inet_ntoa(pkt.dst)
-    hostname = dns.get_hostname(dst_addr)
-    src_port = None
-    dst_port = None
-    proto = None
-    app = None
-    if pkt.p == ip.IP_PROTO_TCP:
+    pkt = dpkt.ip.IP(data)
+    src = socket.inet_ntoa(pkt.src)
+    dst = socket.inet_ntoa(pkt.dst)
+    hostname = opensnitch.dns.get_hostname(dst)
+    src_port = dst_port = proto = pid = path = args = ''
+    if pkt.p == dpkt.ip.IP_PROTO_TCP:
         proto = 'tcp'
         src_port = pkt.tcp.sport
         dst_port = pkt.tcp.dport
-    elif pkt.p == ip.IP_PROTO_UDP:
+    elif pkt.p == dpkt.ip.IP_PROTO_UDP:
         proto = 'udp'
         src_port = pkt.udp.sport
         dst_port = pkt.udp.dport
-    elif pkt.p == ip.IP_PROTO_ICMP:
+    elif pkt.p == dpkt.ip.IP_PROTO_ICMP:
         proto = 'icmp'
-        src_port = None
-        dst_port = None
+        src_port = dst_port = ''
     if proto == 'icmp':
-        app = Application(None, None, None)
-    elif None not in (proto, src_addr, dst_addr):
-        pid = proc.get_pid_by_connection(src_addr, src_port, dst_addr, dst_port, proto)
-        app = Application(pid, *proc._get_app_path_and_cmdline(pid))
-    return _Connection(src_addr, dst_addr, hostname, src_port, dst_port, proto, app)
+        pid = path = args = ''
+    elif '' not in (proto, src, dst):
+        pid = opensnitch.proc.get_pid_by_connection(src, src_port, dst, dst_port, proto)
+        path, args = opensnitch.proc.get_app_path_and_cmdline(pid)
+    return {'src': src, 'dst': dst, 'hostname': hostname, 'src_port': src_port, 'dst_port': dst_port, 'proto': proto, 'pid': pid, 'path': path, 'args': args}
+
+def format(conn):
+    return ' '.join('{pid} {path} {args} {proto} {src}:{src_port} => {hostname} {dst}:{dst_port}'.format(**conn).split())

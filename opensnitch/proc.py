@@ -16,6 +16,7 @@
 # program. If not, go to http://www.gnu.org/licenses/gpl.html
 # or write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+
 import logging
 import psutil
 import os
@@ -34,10 +35,11 @@ def get_pid_by_connection(src_addr, src_p, dst_addr, dst_p, proto='tcp'):
             if conn.laddr[1] != int(src_p):
                 continue
         return conn.pid
-    logging.warning("Could not find process for %s connection %s:%s -> %s:%s", proto, src_addr, src_p, dst_addr, dst_p)
+    logging.debug("could not find process for %s connection %s:%s -> %s:%s", proto, src_addr, src_p, dst_addr, dst_p)
+    return ''
 
-def _get_app_path_and_cmdline(pid):
-    path, args = None, None
+def get_app_path_and_cmdline(pid):
+    path = args = ''
     if not pid:
         return path, args
     try:
@@ -45,8 +47,8 @@ def _get_app_path_and_cmdline(pid):
     except:
         logging.exception('proc lookup failed')
     try:
-        with open(f"/proc/{pid}/cmdline") as cmd_fd:
-            cmd_fd.read().replace('\0', ' ').strip()
+        with open(f"/proc/{pid}/cmdline") as f:
+            args = f.read().replace('\0', ' ').strip()
     except:
         logging.exception('failed cmdline lookup')
     return path, args

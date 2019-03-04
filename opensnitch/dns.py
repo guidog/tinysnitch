@@ -19,8 +19,20 @@
 import scapy.layers.dns
 import scapy.layers.inet
 import logging
+import subprocess
 
-hosts = {'127.0.0.1': 'localhost'}
+co = lambda *a: subprocess.check_output(' '.join(map(str, a)), shell=True, executable='/bin/bash').decode('utf-8').strip()
+
+hosts = {}
+
+def populate_localhosts():
+    with open('/etc/hostname') as f:
+        hostname = f.read().strip()
+    for line in co('ip a | grep inet').splitlines():
+        _, addr, *_ = line.strip().split()
+        addr = addr.split('/')[0]
+        hosts[addr] = hostname
+        logging.info(f'localhost: {addr} => {hostname}')
 
 def parse_dns(packet):
     ip = packet['IP']
@@ -48,5 +60,4 @@ def get_hostname(address):
     try:
         return hosts[address]
     except KeyError:
-        logging.debug("No hostname found for address %s" % address)
-        return address
+        return ''
