@@ -25,6 +25,12 @@ co = lambda *a: subprocess.check_output(' '.join(map(str, a)), shell=True, execu
 
 hosts = {}
 
+def _decode(x):
+    try:
+        return x.decode('utf-8').rstrip('.').strip('"')
+    except:
+        return x
+
 def populate_localhosts():
     with open('/etc/hostname') as f:
         hostname = f.read().strip()
@@ -39,14 +45,14 @@ def parse_dns(packet):
     udp = packet['UDP']
     dns = packet['DNS']
     if int(udp.dport) == 53:
-        qname = dns.qd.qname
+        qname = _decode(dns.qd.qname)
         yield ip.src, udp.sport, ip.dst, udp.dport, qname, None
     # dns reply packet
     elif int(udp.sport) == 53:
         # dns DNSRR count (answer count)
         for i in range(dns.ancount):
             dnsrr = dns.an[i]
-            yield ip.src, udp.sport, ip.dst, udp.dport, dnsrr.rrname, dnsrr.rdata
+            yield ip.src, udp.sport, ip.dst, udp.dport, _decode(dnsrr.rrname), _decode(dnsrr.rdata)
 
 def add_response(data):
     packet = scapy.layers.inet.IP(data)

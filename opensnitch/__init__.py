@@ -46,10 +46,10 @@ def pkt_callback(pkt):
     if conn['src'] == conn['dst'] == '127.0.0.1':
         pkt.accept()
     elif True:
-        logging.info('allow %s"', opensnitch.connection.format(conn))
+        logging.info('allow %s', opensnitch.connection.format(conn))
         pkt.accept()
     else:
-        logging.info('deny %s"', opensnitch.connection.format(conn))
+        logging.info('deny %s', opensnitch.connection.format(conn))
         drop_packet(pkt, conn)
 
 def _main(setup_firewall=False, teardown_firewall=False):

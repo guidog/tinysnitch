@@ -48,7 +48,7 @@ def get_app_path_and_cmdline(pid):
         logging.exception('proc lookup failed')
     try:
         with open(f"/proc/{pid}/cmdline") as f:
-            args = f.read().replace('\0', ' ').strip()
+            args = ' '.join(f.read().replace('\0', ' ').strip().split()[1:])
     except:
         logging.exception('failed cmdline lookup')
     return path, args
