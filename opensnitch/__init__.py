@@ -19,9 +19,7 @@
 
 import argh
 import netfilterqueue
-import scapy.layers.inet
 import logging
-import prctl
 import opensnitch.connection
 import opensnitch.dns
 import subprocess
@@ -35,10 +33,6 @@ iptables_rules = (
     "OUTPUT --protocol tcp -m mark --mark 101285 -j REJECT",
 )
 
-required_caps = ((prctl.CAP_NET_RAW, prctl.ALL_FLAGS, True),
-                 (prctl.CAP_DAC_OVERRIDE, prctl.ALL_FLAGS, True),
-                 (prctl.CAP_NET_ADMIN, prctl.ALL_FLAGS, True))
-
 cc = lambda *a: subprocess.check_call(' '.join(map(str, a)), shell=True, executable='/bin/bash')
 
 def drop_packet(pkt, conn):
@@ -47,8 +41,7 @@ def drop_packet(pkt, conn):
 
 def pkt_callback(pkt):
     data = pkt.get_payload()
-    ip = scapy.layers.inet.IP(data)
-    opensnitch.dns.add_response(ip)
+    opensnitch.dns.add_response(data)
     conn = opensnitch.connection.Connection(data)
     if conn.src_addr == conn.dst_addr == '127.0.0.1':
         pkt.accept()

@@ -17,6 +17,7 @@
 # or write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 import scapy.layers.dns
+import scapy.layers.inet
 import logging
 
 hosts = {'127.0.0.1': 'localhost'}
@@ -35,7 +36,8 @@ def parse_dns(packet):
             dnsrr = dns.an[i]
             yield ip.src, udp.sport, ip.dst, udp.dport, dnsrr.rrname, dnsrr.rdata
 
-def add_response(packet):
+def add_response(data):
+    packet = scapy.layers.inet.IP(data)
     if packet and packet.haslayer('UDP') and packet.haslayer('DNS'):
         for _, _, _, _, name, addr in parse_dns(packet):
             if addr:
