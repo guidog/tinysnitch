@@ -6,76 +6,63 @@ ffibuilder = FFI()
 ffibuilder.cdef(r"""
 
 typedef struct {
-    unsigned int verdict;
-    unsigned int mark;
     unsigned int mark_set;
     unsigned int length;
     unsigned char *data;
 } verdictContainer;
-extern "Python" void py_callback(int id, unsigned char* data, int len, unsigned int mark, unsigned int idx, verdictContainer *vc);
-static int nf_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *arg);
-static inline struct nfq_q_handle* CreateQueue(struct nfq_handle *h, unsigned int queue, unsigned int idx);
-static inline int Run(struct nfq_handle *h, int fd);
+extern "Python" void py_callback(unsigned char* data, unsigned int len, verdictContainer *vc);
+static inline struct nfq_q_handle* create_queue(struct nfq_handle *h, unsigned int queue, unsigned int idx);
+static inline int run(struct nfq_handle *h, int fd);
 struct nfq_handle * nfq_open (void);
+struct nfnl_handle * nfq_nfnlh (struct nfq_handle *h);
+unsigned int nfnl_rcvbufsiz (const struct nfnl_handle *h, unsigned int size);
 int nfq_close (struct nfq_handle *h);
 int nfq_bind_pf (struct nfq_handle *h, uint16_t pf);
 int nfq_unbind_pf (struct nfq_handle *h, uint16_t pf);
 int nfq_set_queue_maxlen (struct nfq_q_handle *qh, uint32_t queuelen);
 int nfq_set_mode (struct nfq_q_handle *qh, uint8_t mode, uint32_t range);
 int nfq_fd (struct nfq_handle *h);
-unsigned int nfnl_rcvbufsiz (const struct nfnl_handle *h, unsigned int size);
-struct nfnl_handle * nfq_nfnlh (struct nfq_handle *h);
+int nfq_destroy_queue (struct nfq_q_handle *qh);
+
 """)
 
 ffibuilder.set_source(
     "_netfilter",
     r"""
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
 #include <errno.h>
-#include <math.h>
-#include <unistd.h>
 #include <netinet/in.h>
-#include <linux/types.h>
-#include <linux/socket.h>
-#include <linux/netfilter.h>
 #include <libnetfilter_queue/libnetfilter_queue.h>
 
+#define NF_MARK 101285
+#define NF_ACCEPT 1
+
 typedef struct {
-    unsigned int verdict;
-    unsigned int mark;
     unsigned int mark_set;
     unsigned int length;
     unsigned char *data;
 } verdictContainer;
 
-static void py_callback(int id, unsigned char* data, int len, unsigned int mark, unsigned int idx, verdictContainer *vc);
+static void py_callback(unsigned char* data, unsigned int len, verdictContainer *vc);
 
 static int nf_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *arg) {
-    unsigned int id = -1, idx = 0, mark = 0;
-    struct nfqnl_msg_packet_hdr *ph = NULL;
     unsigned char *buffer = NULL;
-    int size = 0;
     verdictContainer vc = {0};
-    mark = nfq_get_nfmark(nfa);
-    ph = nfq_get_msg_packet_hdr(nfa);
-    id = ntohl(ph->packet_id);
-    size = nfq_get_payload(nfa, &buffer);
-    idx = (unsigned int)((uintptr_t)arg);
-    py_callback(id, buffer, size, mark, idx, &vc);
-    if (vc.mark_set == 1)
-      return nfq_set_verdict2(qh, id, vc.verdict, vc.mark, vc.length, vc.data);
+    struct nfqnl_msg_packet_hdr *ph = nfq_get_msg_packet_hdr(nfa);
+    unsigned int id = ntohl(ph->packet_id);
+    unsigned int size = nfq_get_payload(nfa, &buffer);
+    py_callback(buffer, size, &vc);
+    if (vc.mark_set)
+      return nfq_set_verdict2(qh, id, NF_ACCEPT, NF_MARK, size, buffer);
     else
-      return nfq_set_verdict(qh, id, vc.verdict, vc.length, vc.data);
+      return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
 }
 
-static inline struct nfq_q_handle* CreateQueue(struct nfq_handle *h, unsigned int queue, unsigned int idx) {
+static inline struct nfq_q_handle* create_queue(struct nfq_handle *h, unsigned int queue, unsigned int idx) {
     return nfq_create_queue(h, queue, &nf_callback, (void*)((uintptr_t)idx));
 }
 
-static inline int Run(struct nfq_handle *h, int fd) {
+static inline int run(struct nfq_handle *h, int fd) {
     char buf[4096] __attribute__ ((aligned));
     int rcvd, opt = 1;
     setsockopt(fd, SOL_NETLINK, NETLINK_NO_ENOBUFS, &opt, sizeof(int));
