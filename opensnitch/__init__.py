@@ -18,7 +18,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
 import argh
-import netfilterqueue
+# import netfilterqueue
 import logging
 import opensnitch.connection
 import opensnitch.dns
@@ -55,23 +55,6 @@ def pkt_callback(pkt):
         logging.info('deny %s', opensnitch.connection.format(conn))
         drop_packet(pkt, conn)
 
-def _main(setup_firewall=False, teardown_firewall=False):
-    logging.basicConfig(level='INFO', format='%(message)s')
-    opensnitch.dns.populate_localhosts()
-    if setup_firewall:
-        for rule in iptables_rules:
-            cc('iptables -I', rule)
-    elif teardown_firewall:
-        for rule in iptables_rules:
-            cc('iptables -D', rule, '|| echo failed to delete:', rule)
-    else:
-        q = netfilterqueue.NetfilterQueue()
-        q.bind(0, pkt_callback, 1024 * 4)
-        try:
-            q.run()
-        finally:
-            q.unbind()
-
 # def _main(setup_firewall=False, teardown_firewall=False):
 #     logging.basicConfig(level='INFO', format='%(message)s')
 #     opensnitch.dns.populate_localhosts()
@@ -82,10 +65,27 @@ def _main(setup_firewall=False, teardown_firewall=False):
 #         for rule in iptables_rules:
 #             cc('iptables -D', rule, '|| echo failed to delete:', rule)
 #     else:
-#         nfq_handle, nfq_q_handle = opensnitch.netfilter.create(0)
-#         nfq_fd = opensnitch.netfilter.setup(nfq_handle, nfq_q_handle)
-#         opensnitch.netfilter.run(nfq_handle, nfq_fd)
-#         # TODO try/finally destroy()
+#         q = netfilterqueue.NetfilterQueue()
+#         q.bind(0, pkt_callback, 1024 * 4)
+#         try:
+#             q.run()
+#         finally:
+#             q.unbind()
+
+def _main(setup_firewall=False, teardown_firewall=False):
+    logging.basicConfig(level='INFO', format='%(message)s')
+    opensnitch.dns.populate_localhosts()
+    if setup_firewall:
+        for rule in iptables_rules:
+            cc('iptables -I', rule)
+    elif teardown_firewall:
+        for rule in iptables_rules:
+            cc('iptables -D', rule, '|| echo failed to delete:', rule)
+    else:
+        nfq_handle, nfq_q_handle = opensnitch.netfilter.create(0)
+        nfq_fd = opensnitch.netfilter.setup(nfq_handle, nfq_q_handle)
+        opensnitch.netfilter.run(nfq_handle, nfq_fd)
+        # TODO try/finally destroy()
 
 def main():
     argh.dispatch_command(_main)

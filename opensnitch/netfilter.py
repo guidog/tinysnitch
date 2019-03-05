@@ -53,14 +53,14 @@ def py_callback(_id, data, length, mark, idx, vc):
     packet = scapy.layers.inet.IP(xdata)
     opensnitch.dns.add_response(packet)
     conn = opensnitch.connection.parse(packet)
-    if conn['src'] == conn['dst'] == '127.0.0.1':
+    if (conn['src'] == conn['dst'] == '127.0.0.1' or conn['proto'] == 'hopopt'):
         vc.verdict = NF_ACCEPT
     elif True:
-        logging.info('allow %s', opensnitch.connection.format(conn))
+        logging.info(f'allow: {opensnitch.connection.format(conn)}')
         vc.verdict = NF_ACCEPT
         vc.data = data
         vc.length = length
     else:
-        logging.info('deny %s', opensnitch.connection.format(conn))
+        logging.info(f'deny: {opensnitch.connection.format(conn)}')
         vc.mark_set = NF_MARK_SET
         vc.mark = mark # NF_MARK

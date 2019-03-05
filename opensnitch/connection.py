@@ -40,4 +40,4 @@ def parse(packet):
     return {'src': src, 'dst': dst, 'hostname': hostname, 'src_port': src_port, 'dst_port': dst_port, 'proto': proto, 'pid': pid, 'path': path, 'args': args}
 
 def format(conn):
-    return ' '.join('{src}:{src_port} => {hostname} {dst}:{dst_port} [{pid} {path} {args} {proto}]'.format(**conn).split())
+    return ' '.join('{src}:{src_port} => {hostname} {dst}:{dst_port} {proto} {pid} {path} {args}'.format(**conn).split())

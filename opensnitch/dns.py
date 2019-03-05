@@ -39,7 +39,7 @@ def populate_localhosts():
         _, addr, *_ = line.strip().split()
         addr = addr.split('/')[0]
         hosts[addr] = hostname
-        logging.info(f'localhost: {addr} => {hostname}')
+        logging.info(f'dns: {addr} => {hostname}')
 
 def parse_dns(packet):
     udp = packet['UDP']
@@ -55,10 +55,10 @@ def add_response(packet):
     if UDP in packet and DNS in packet:
         for name, addr in parse_dns(packet):
             if addr:
-                logging.info(f'{addr} => {name}')
+                logging.info(f'dns: {addr} => {name}')
                 hosts[addr] = name
             else:
-                logging.info(f'resolved: {name}')
+                logging.info(f'dns: {name}')
 
 def get_hostname(address):
     return hosts.get(address, '')
