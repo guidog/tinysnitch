@@ -1,4 +1,9 @@
 *.pyc
+*.h
+*.go
+*.c
+*.so
+*.o
 build
 dist
 *.egg-info

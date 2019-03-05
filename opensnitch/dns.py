@@ -16,10 +16,11 @@
 # program. If not, go to http://www.gnu.org/licenses/gpl.html
 # or write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-import scapy.layers.dns
-import scapy.layers.inet
+
 import logging
 import subprocess
+from scapy.layers.dns import DNS
+from scapy.layers.inet import UDP
 
 co = lambda *a: subprocess.check_output(' '.join(map(str, a)), shell=True, executable='/bin/bash').decode('utf-8').strip()
 
@@ -27,7 +28,7 @@ hosts = {}
 
 def _decode(x):
     try:
-        return x.decode('utf-8').rstrip('.').strip('"')
+        return x.decode('utf-8').rstrip('.')
     except:
         return x
 
@@ -41,29 +42,23 @@ def populate_localhosts():
         logging.info(f'localhost: {addr} => {hostname}')
 
 def parse_dns(packet):
-    ip = packet['IP']
     udp = packet['UDP']
     dns = packet['DNS']
     if int(udp.dport) == 53:
-        qname = _decode(dns.qd.qname)
-        yield ip.src, udp.sport, ip.dst, udp.dport, qname, None
-    # dns reply packet
+        yield _decode(dns.qd.qname), None
     elif int(udp.sport) == 53:
-        # dns DNSRR count (answer count)
         for i in range(dns.ancount):
             dnsrr = dns.an[i]
-            yield ip.src, udp.sport, ip.dst, udp.dport, _decode(dnsrr.rrname), _decode(dnsrr.rdata)
+            yield _decode(dnsrr.rrname), _decode(dnsrr.rdata)
 
-def add_response(data):
-    packet = scapy.layers.inet.IP(data)
-    if packet and packet.haslayer('UDP') and packet.haslayer('DNS'):
-        for _, _, _, _, name, addr in parse_dns(packet):
+def add_response(packet):
+    if UDP in packet and DNS in packet:
+        for name, addr in parse_dns(packet):
             if addr:
                 logging.info(f'{addr} => {name}')
                 hosts[addr] = name
+            else:
+                logging.info(f'resolved: {name}')
 
 def get_hostname(address):
-    try:
-        return hosts[address]
-    except KeyError:
-        return ''
+    return hosts.get(address, '')

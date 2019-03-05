@@ -22,7 +22,9 @@ import netfilterqueue
 import logging
 import opensnitch.connection
 import opensnitch.dns
+import opensnitch.netfilter
 import subprocess
+import scapy.layers.inet
 
 iptables_rules = (
     # TODO what happens if we drop mangle here?
@@ -41,9 +43,10 @@ def drop_packet(pkt, conn):
 
 def pkt_callback(pkt):
     data = pkt.get_payload()
-    opensnitch.dns.add_response(data)
-    conn = opensnitch.connection.parse(data)
-    if conn['src'] == conn['dst'] == '127.0.0.1':
+    packet = scapy.layers.inet.IP(data)
+    opensnitch.dns.add_response(packet)
+    conn = opensnitch.connection.parse(packet)
+    if (conn['src'] == conn['dst'] == '127.0.0.1' or conn['proto'] == 'hopopt'):
         pkt.accept()
     elif True:
         logging.info('allow %s', opensnitch.connection.format(conn))
@@ -68,6 +71,21 @@ def _main(setup_firewall=False, teardown_firewall=False):
             q.run()
         finally:
             q.unbind()
+
+# def _main(setup_firewall=False, teardown_firewall=False):
+#     logging.basicConfig(level='INFO', format='%(message)s')
+#     opensnitch.dns.populate_localhosts()
+#     if setup_firewall:
+#         for rule in iptables_rules:
+#             cc('iptables -I', rule)
+#     elif teardown_firewall:
+#         for rule in iptables_rules:
+#             cc('iptables -D', rule, '|| echo failed to delete:', rule)
+#     else:
+#         nfq_handle, nfq_q_handle = opensnitch.netfilter.create(0)
+#         nfq_fd = opensnitch.netfilter.setup(nfq_handle, nfq_q_handle)
+#         opensnitch.netfilter.run(nfq_handle, nfq_fd)
+#         # TODO try/finally destroy()
 
 def main():
     argh.dispatch_command(_main)

@@ -17,35 +17,27 @@
 # or write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
-import socket
 import opensnitch.proc
 import opensnitch.dns
-import dpkt.ip
 
-def parse(payload):
-    data = payload
-    pkt = dpkt.ip.IP(data)
-    src = socket.inet_ntoa(pkt.src)
-    dst = socket.inet_ntoa(pkt.dst)
+def ip_proto(pkt):
+    proto_field = pkt.get_field('proto')
+    return proto_field.i2s[pkt.proto]
+
+def parse(packet):
+    src = packet.src
+    dst = packet.dst
     hostname = opensnitch.dns.get_hostname(dst)
     src_port = dst_port = proto = pid = path = args = ''
-    if pkt.p == dpkt.ip.IP_PROTO_TCP:
-        proto = 'tcp'
-        src_port = pkt.tcp.sport
-        dst_port = pkt.tcp.dport
-    elif pkt.p == dpkt.ip.IP_PROTO_UDP:
-        proto = 'udp'
-        src_port = pkt.udp.sport
-        dst_port = pkt.udp.dport
-    elif pkt.p == dpkt.ip.IP_PROTO_ICMP:
-        proto = 'icmp'
-        src_port = dst_port = ''
-    if proto == 'icmp':
-        pid = path = args = ''
-    elif '' not in (proto, src, dst):
+    proto = packet.get_field('proto').i2s[packet.proto]
+    if 'TCP' in packet or 'UDP' in packet:
+        ip = packet['IP']
+        src_port = ip.sport
+        dst_port = ip.dport
+    if proto in {'tcp', 'udp'}:
         pid = opensnitch.proc.get_pid_by_connection(src, src_port, dst, dst_port, proto)
         path, args = opensnitch.proc.get_app_path_and_cmdline(pid)
     return {'src': src, 'dst': dst, 'hostname': hostname, 'src_port': src_port, 'dst_port': dst_port, 'proto': proto, 'pid': pid, 'path': path, 'args': args}
 
 def format(conn):
-    return ' '.join('{pid} {path} {args} {proto} {src}:{src_port} => {hostname} {dst}:{dst_port}'.format(**conn).split())
+    return ' '.join('{src}:{src_port} => {hostname} {dst}:{dst_port} [{pid} {path} {args} {proto}]'.format(**conn).split())
