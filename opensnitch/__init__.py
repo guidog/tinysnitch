@@ -18,7 +18,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
 import argh
-import netfilterqueue
+# import netfilterqueue
 import logging
 import opensnitch.connection
 import opensnitch.dns
