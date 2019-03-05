@@ -46,7 +46,10 @@ def py_callback(data, length, vc):
     packet = scapy.layers.inet.IP(unpacked)
     opensnitch.dns.add_response(packet)
     conn = opensnitch.connection.parse(packet)
-    if (conn['src'] == conn['dst'] == '127.0.0.1' or conn['proto'] == 'hopopt'):
+    if (
+        # conn['src'] == conn['dst'] == '127.0.0.1' or
+        conn['proto'] == 'hopopt'
+        ):
         logging.debug(f'allow: {opensnitch.connection.format(conn)}')
     elif True:
         logging.info(f'allow: {opensnitch.connection.format(conn)}')

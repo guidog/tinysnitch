@@ -71,7 +71,7 @@ def pkt_callback(pkt):
 #             q.unbind()
 
 def _main(setup_firewall=False, teardown_firewall=False, debug=False):
-    logging.basicConfig(level='DEBUG' if debug else 'INFO', format='%(message)s')
+    # logging.basicConfig(level='DEBUG' if debug else 'INFO', format='%(message)s')
     if setup_firewall:
         for rule in iptables_rules:
             cc('iptables -I', rule)
@@ -84,8 +84,10 @@ def _main(setup_firewall=False, teardown_firewall=False, debug=False):
         try:
             nfq_fd = opensnitch.netfilter.setup(nfq_handle, nfq_q_handle)
             opensnitch.netfilter.run(nfq_handle, nfq_fd)
+        except KeyboardInterrupt:
+            pass
         finally:
-            opensnitch.netfilter.destroy()
+            opensnitch.netfilter.destroy(nfq_q_handle, nfq_handle)
 
 def main():
     argh.dispatch_command(_main)
