@@ -34,10 +34,11 @@ def parse(packet):
         ip = packet['IP']
         src_port = ip.sport
         dst_port = ip.dport
-    if proto in {'tcp', 'udp'}:
-        pid = opensnitch.proc.get_pid_by_connection(src, src_port, dst, dst_port, proto)
-        path, args = opensnitch.proc.get_app_path_and_cmdline(pid)
-    return {'src': src, 'dst': dst, 'hostname': hostname, 'src_port': src_port, 'dst_port': dst_port, 'proto': proto, 'pid': pid, 'path': path, 'args': args}
+    # if proto in {'tcp', 'udp'}:
+        # pid = opensnitch.proc.get_pid_by_connection(src, src_port, dst, dst_port, proto)
+        # path, args = opensnitch.proc.get_app_path_and_cmdline(pid)
+    return src, dst, hostname, src_port, dst_port, proto, pid, path, args
 
 def format(conn):
-    return ' '.join('{src}:{src_port} => {hostname} {dst}:{dst_port} {proto} {pid} {path} {args}'.format(**conn).split())
+    src, dst, hostname, src_port, dst_port, proto, pid, path, args = conn
+    return ' '.join(f'{src}:{src_port} => {hostname} {dst}:{dst_port} {proto} {pid} {path} {args}'.split())

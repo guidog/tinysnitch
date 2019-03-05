@@ -44,13 +44,13 @@ def pkt_callback(pkt):
     packet = scapy.layers.inet.IP(data)
     opensnitch.dns.add_response(packet)
     conn = opensnitch.connection.parse(packet)
-    if (conn['src'] == conn['dst'] == '127.0.0.1' or conn['proto'] == 'hopopt'):
-        pkt.accept()
-    elif True:
-        logging.info('allow %s', opensnitch.connection.format(conn))
+    # if (conn['src'] == conn['dst'] == '127.0.0.1' or conn['proto'] == 'hopopt'):
+        # pkt.accept()
+    if True:
+        # logging.info('allow %s', opensnitch.connection.format(conn))
         pkt.accept()
     else:
-        logging.info('deny %s', opensnitch.connection.format(conn))
+        # logging.info('deny %s', opensnitch.connection.format(conn))
         drop_packet(pkt, conn)
 
 # def _main(setup_firewall=False, teardown_firewall=False):
@@ -71,7 +71,11 @@ def pkt_callback(pkt):
 #             q.unbind()
 
 def _main(setup_firewall=False, teardown_firewall=False, debug=False):
-    # logging.basicConfig(level='DEBUG' if debug else 'INFO', format='%(message)s')
+    logging.basicConfig(
+        # level='DEBUG' if debug else 'INFO',
+        level='ERROR',
+        format='%(message)s',
+    )
     if setup_firewall:
         for rule in iptables_rules:
             cc('iptables -I', rule)
