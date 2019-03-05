@@ -27,7 +27,9 @@ unsigned int nfnl_rcvbufsiz (const struct nfnl_handle *h, unsigned int size);
 struct nfnl_handle * nfq_nfnlh (struct nfq_handle *h);
 """)
 
-ffibuilder.set_source("_netfilter", r"""
+ffibuilder.set_source(
+    "_netfilter",
+    r"""
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -82,7 +84,10 @@ static inline int Run(struct nfq_handle *h, int fd) {
     return errno;
 }
 
-""", libraries=['netfilter_queue'])
+    """,
+    libraries=['netfilter_queue'],
+    extra_compile_args=['-O3', '-march=native', '-ffast-math'],
+)
 
 if __name__ == "__main__":
     ffibuilder.compile(verbose=True)

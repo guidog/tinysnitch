@@ -18,7 +18,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
 import argh
-# import netfilterqueue
+import netfilterqueue
 import logging
 import opensnitch.connection
 import opensnitch.dns
@@ -26,14 +26,12 @@ import opensnitch.netfilter
 import subprocess
 import scapy.layers.inet
 
-iptables_rules = (
-    # TODO what happens if we drop mangle here?
-    # TODO what happens if we enqueue ALL traffic in and out, tcp and udp?
+iptables_rules = [
     "INPUT --protocol udp --sport 53 -j NFQUEUE --queue-num 0",
     "OUTPUT -t mangle -m conntrack --ctstate NEW -j NFQUEUE --queue-num 0",
     "INPUT -t mangle -m conntrack --ctstate NEW -j NFQUEUE --queue-num 0",
     "OUTPUT --protocol tcp -m mark --mark 101285 -j REJECT",
-)
+]
 
 cc = lambda *a: subprocess.check_call(' '.join(map(str, a)), shell=True, executable='/bin/bash')
 
@@ -57,7 +55,6 @@ def pkt_callback(pkt):
 
 # def _main(setup_firewall=False, teardown_firewall=False):
 #     logging.basicConfig(level='INFO', format='%(message)s')
-#     opensnitch.dns.populate_localhosts()
 #     if setup_firewall:
 #         for rule in iptables_rules:
 #             cc('iptables -I', rule)
@@ -65,6 +62,7 @@ def pkt_callback(pkt):
 #         for rule in iptables_rules:
 #             cc('iptables -D', rule, '|| echo failed to delete:', rule)
 #     else:
+#         opensnitch.dns.populate_localhosts()
 #         q = netfilterqueue.NetfilterQueue()
 #         q.bind(0, pkt_callback, 1024 * 4)
 #         try:
@@ -74,7 +72,6 @@ def pkt_callback(pkt):
 
 def _main(setup_firewall=False, teardown_firewall=False):
     logging.basicConfig(level='INFO', format='%(message)s')
-    opensnitch.dns.populate_localhosts()
     if setup_firewall:
         for rule in iptables_rules:
             cc('iptables -I', rule)
@@ -82,6 +79,7 @@ def _main(setup_firewall=False, teardown_firewall=False):
         for rule in iptables_rules:
             cc('iptables -D', rule, '|| echo failed to delete:', rule)
     else:
+        opensnitch.dns.populate_localhosts()
         nfq_handle, nfq_q_handle = opensnitch.netfilter.create(0)
         nfq_fd = opensnitch.netfilter.setup(nfq_handle, nfq_q_handle)
         opensnitch.netfilter.run(nfq_handle, nfq_fd)
