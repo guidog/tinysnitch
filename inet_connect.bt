@@ -1,28 +1,8 @@
 #!/usr/bin/env bpftrace
 /*
- * tcpconnect.bt  Trace TCP connect()s.
- *                For Linux, uses bpftrace and eBPF.
- *
- * USAGE: tcpconnect.bt
- *
- * This is a bpftrace version of the bcc tool of the same name.
- * It is limited to ipv4 addresses.
- *
- * All connection attempts are traced, even if they ultimately fail.
- *
- * This uses dynamic tracing of kernel functions, and will need to be updated
- * to match kernel changes.
- *
+ * based on: https://github.com/iovisor/bpftrace/blob/182923e64c0bad8784ff38cdeae2040f90172676/tools/tcpconnect.bt
  * Copyright (c) 2018 Dale Hamel.
  * Licensed under the Apache License, Version 2.0 (the "License")
- *
- * 23-Nov-2018	Dale Hamel	created this.
- *
- * BEGIN
- * {
- *   printf("%-8s %-8s %-16s ", "TIME", "PID", "COMM");
- *   printf("%-14s %-6s %-14s %-6s\n", "SADDR", "SPORT", "DADDR", "DPORT");
- * }
  */
 
 #include <net/sock.h>
