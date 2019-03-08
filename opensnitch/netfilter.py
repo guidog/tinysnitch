@@ -4,7 +4,6 @@ import logging
 import time
 import opensnitch.connection
 import opensnitch.dns
-import opensnitch.netfilter
 
 AF_INET = ffi.cast('int', 2)
 AF_INET6 = ffi.cast('int', 10)
@@ -46,12 +45,9 @@ def py_callback(data, length, vc):
     packet = scapy.layers.inet.IP(unpacked)
     opensnitch.dns.add_response(packet)
     conn = opensnitch.connection.parse(packet)
-    # if (
-    #     # conn['src'] == conn['dst'] == '127.0.0.1' or
-    #     conn['proto'] == 'hopopt'
-    #     ):
-    #     pass
-    #     # logging.debug(f'allow: {opensnitch.connection.format(conn)}')
+    if (conn['src'] == conn['dst'] == '127.0.0.1'
+        or conn['proto'] == 'hopopt'):
+        logging.debug(f'allow: {opensnitch.connection.format(conn)}')
     if True:
         logging.info(f'allow: {opensnitch.connection.format(conn)}')
     else:
