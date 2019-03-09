@@ -17,7 +17,6 @@
 # or write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
-import opensnitch.proc
 import opensnitch.dns
 
 def ip_proto(pkt):
@@ -34,9 +33,11 @@ def parse(packet):
         ip = packet['IP']
         src_port = ip.sport
         dst_port = ip.dport
-    # if proto in {'tcp', 'udp'}:
+    if proto in {'tcp', 'udp'}:
+
         # pid = opensnitch.proc.get_pid_by_connection(src, src_port, dst, dst_port, proto)
         # path, args = opensnitch.proc.get_app_path_and_cmdline(pid)
+        pass
     return src, dst, hostname, src_port, dst_port, proto, pid, path, args
 
 def format(conn):

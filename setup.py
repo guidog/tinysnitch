@@ -7,5 +7,4 @@ setuptools.setup(
     install_requires=[
                       ],
     entry_points={'console_scripts': ['opensnitchd = opensnitch:main']},
-    description='azure',
 )

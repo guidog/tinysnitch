@@ -1,4 +1,18 @@
-from opensnitch._netfilter import ffi, lib
+try:
+    from opensnitch._netfilter import ffi, lib
+except ModuleNotFoundError:
+    import opensnitch.netfilter_build
+    import os
+    orig = os.getcwd()
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    print(os.getcwd(), flush=True)
+    for path in os.listdir('.'):
+        if path.endswith('.c') or path.endswith('.o') or path.endswith('.so'):
+            os.remove(path)
+    opensnitch.netfilter_build.ffibuilder.compile(verbose=True)
+    os.chdir(orig)
+    from opensnitch._netfilter import ffi, lib
+
 import scapy.layers.inet
 import logging
 import time
@@ -45,8 +59,9 @@ def py_callback(data, length, vc):
     packet = scapy.layers.inet.IP(unpacked)
     opensnitch.dns.add_response(packet)
     conn = opensnitch.connection.parse(packet)
-    if (conn['src'] == conn['dst'] == '127.0.0.1'
-        or conn['proto'] == 'hopopt'):
+    src, dst, hostname, src_port, dst_port, proto, pid, path, args = conn
+    if (src == dst == '127.0.0.1'
+        or proto == 'hopopt'):
         logging.debug(f'allow: {opensnitch.connection.format(conn)}')
     if True:
         logging.info(f'allow: {opensnitch.connection.format(conn)}')
