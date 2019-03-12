@@ -1,3 +1,22 @@
+# This file is part of OpenSnitch.
+#
+# Copyright(c) 2019 Nathan Todd-Stone
+# me@nathants.com
+# https://nathants.com
+#
+# This file may be licensed under the terms of of the
+# GNU General Public License Version 2 (the ``GPL'').
+#
+# Software distributed under the License is distributed
+# on an ``AS IS'' basis, WITHOUT WARRANTY OF ANY KIND, either
+# express or implied. See the GPL for the specific language
+# governing rights and limitations.
+#
+# You should have received a copy of the GPL along with this
+# program. If not, go to http://www.gnu.org/licenses/gpl.html
+# or write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+
 try:
     from opensnitch._netfilter import ffi, lib
 except ModuleNotFoundError:
@@ -19,6 +38,8 @@ import time
 import opensnitch.connection
 import opensnitch.dns
 
+ALLOW = ffi.cast('int', 0)
+DENY = ffi.cast('int', 1)
 AF_INET = ffi.cast('int', 2)
 AF_INET6 = ffi.cast('int', 10)
 NF_MARK_SET = ffi.cast('unsigned int', 1)
@@ -54,17 +75,19 @@ def destroy(nfq_q_handle, nfq_handle):
         assert lib.nfq_close(nfq_handle) == 0
 
 @ffi.def_extern()
-def py_callback(data, length, vc):
+def py_callback(data, length):
     unpacked = bytes(ffi.unpack(data, length))
     packet = scapy.layers.inet.IP(unpacked)
     opensnitch.dns.add_response(packet)
     conn = opensnitch.connection.parse(packet)
     src, dst, hostname, src_port, dst_port, proto, pid, path, args = conn
+    1/0
     if (src == dst == '127.0.0.1'
         or proto == 'hopopt'):
         logging.debug(f'allow: {opensnitch.connection.format(conn)}')
     if True:
         logging.info(f'allow: {opensnitch.connection.format(conn)}')
+        return ALLOW
     else:
         logging.info(f'deny: {opensnitch.connection.format(conn)}')
-        vc.mark_set = NF_MARK_SET
+        return DENY

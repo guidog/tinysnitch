@@ -1,16 +1,34 @@
-# take from: https://github.com/evilsocket/opensnitch/blob/5c8f7102c29caf94e967f8433a68b861a4b1666f/daemon/netfilter/queue.h
+# This file is part of OpenSnitch.
+#
+# Copyright(c) 2019 Nathan Todd-Stone
+# me@nathants.com
+# https://nathants.com
+#
+# Copyright(c) 2018 Simone Margaritelli
+# evilsocket@gmail.com
+# http://www.evilsocket.net
+#
+# This file may be licensed under the terms of of the
+# GNU General Public License Version 2 (the ``GPL'').
+#
+# Software distributed under the License is distributed
+# on an ``AS IS'' basis, WITHOUT WARRANTY OF ANY KIND, either
+# express or implied. See the GPL for the specific language
+# governing rights and limitations.
+#
+# You should have received a copy of the GPL along with this
+# program. If not, go to http://www.gnu.org/licenses/gpl.html
+# or write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+#
+# based on: https://github.com/evilsocket/opensnitch/blob/5c8f7102c29caf94e967f8433a68b861a4b1666f/daemon/netfilter/queue.h
 
 from cffi import FFI
 ffibuilder = FFI()
 
 ffibuilder.cdef(r"""
 
-typedef struct {
-    unsigned int mark_set;
-    unsigned int length;
-    unsigned char *data;
-} verdictContainer;
-extern "Python" void py_callback(unsigned char* data, unsigned int len, verdictContainer *vc);
+extern "Python" void py_callback(unsigned char* data, unsigned int len);
 static inline struct nfq_q_handle* create_queue(struct nfq_handle *h, unsigned int queue, unsigned int idx);
 static inline int run(struct nfq_handle *h, int fd);
 struct nfq_handle * nfq_open (void);
@@ -37,22 +55,14 @@ ffibuilder.set_source(
 #define NF_MARK 101285
 #define NF_ACCEPT 1
 
-typedef struct {
-    unsigned int mark_set;
-    unsigned int length;
-    unsigned char *data;
-} verdictContainer;
-
-static void py_callback(unsigned char* data, unsigned int len, verdictContainer *vc);
+static void py_callback(unsigned char* data, unsigned int len);
 
 static int nf_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *arg) {
     unsigned char *buffer = NULL;
-    verdictContainer vc = {0};
     struct nfqnl_msg_packet_hdr *ph = nfq_get_msg_packet_hdr(nfa);
     unsigned int id = ntohl(ph->packet_id);
     unsigned int size = nfq_get_payload(nfa, &buffer);
-    py_callback(buffer, size, &vc);
-    if (vc.mark_set)
+    if (py_callback(buffer, size))
       return nfq_set_verdict2(qh, id, NF_ACCEPT, NF_MARK, size, buffer);
     else
       return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);

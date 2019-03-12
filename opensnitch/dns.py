@@ -1,5 +1,9 @@
 # This file is part of OpenSnitch.
 #
+# Copyright(c) 2019 Nathan Todd-Stone
+# me@nathants.com
+# https://nathants.com
+#
 # Copyright(c) 2017 Simone Margaritelli
 # evilsocket@gmail.com
 # http://www.evilsocket.net

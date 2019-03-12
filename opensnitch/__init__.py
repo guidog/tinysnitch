@@ -1,8 +1,8 @@
 # This file is part of OpenSnitch.
 #
-# Copyright(c) 2017 Simone Margaritelli
-# evilsocket@gmail.com
-# http://www.evilsocket.net
+# Copyright(c) 2019 Nathan Todd-Stone
+# me@nathants.com
+# https://nathants.com
 #
 # This file may be licensed under the terms of of the
 # GNU General Public License Version 2 (the ``GPL'').
@@ -17,7 +17,6 @@
 # or write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
-import argh
 import logging
 import opensnitch.dns
 import opensnitch.netfilter
@@ -32,7 +31,7 @@ iptables_rules = [
 
 cc = lambda *a: subprocess.check_call(' '.join(map(str, a)), shell=True, executable='/bin/bash')
 
-def _main(setup_firewall=False, teardown_firewall=False, debug=False):
+def main(setup_firewall=False, teardown_firewall=False, debug=False):
     logging.basicConfig(
         level='DEBUG' if debug else 'INFO',
         # level='ERROR',
@@ -54,6 +53,3 @@ def _main(setup_firewall=False, teardown_firewall=False, debug=False):
             pass
         finally:
             opensnitch.netfilter.destroy(nfq_q_handle, nfq_handle)
-
-def main():
-    argh.dispatch_command(_main)
