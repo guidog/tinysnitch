@@ -20,6 +20,7 @@
 import logging
 import opensnitch.dns
 import opensnitch.netfilter
+import opensnitch.bpftrace
 import subprocess
 
 iptables_rules = [
@@ -30,10 +31,13 @@ iptables_rules = [
 ]
 
 cc = lambda *a: subprocess.check_call(' '.join(map(str, a)), shell=True, executable='/bin/bash')
+co = lambda *a: subprocess.check_output(' '.join(map(str, a)), shell=True, executable='/bin/bash').decode('utf-8').strip()
 
-def main(setup_firewall=False, teardown_firewall=False, debug=False):
+assert co('whoami') == 'root', 'opensnitchd must run as root'
+
+def main(setup_firewall=False, teardown_firewall=False):
     logging.basicConfig(
-        level='DEBUG' if debug else 'INFO',
+        level='INFO',
         # level='ERROR',
         format='%(message)s',
     )
@@ -45,6 +49,7 @@ def main(setup_firewall=False, teardown_firewall=False, debug=False):
             cc('iptables -D', rule, '|| echo failed to delete:', rule)
     else:
         opensnitch.dns.populate_localhosts()
+        opensnitch.bpftrace.start()
         nfq_handle, nfq_q_handle = opensnitch.netfilter.create(0)
         try:
             nfq_fd = opensnitch.netfilter.setup(nfq_handle, nfq_q_handle)

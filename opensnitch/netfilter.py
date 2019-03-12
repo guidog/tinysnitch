@@ -37,9 +37,14 @@ import logging
 import time
 import opensnitch.connection
 import opensnitch.dns
+import collections
+import hashlib
 
-ALLOW = ffi.cast('int', 0)
-DENY = ffi.cast('int', 1)
+repeats = collections.defaultdict(int)
+
+DENY = ffi.cast('int', 0)
+ALLOW = ffi.cast('int', 1)
+REPEAT = ffi.cast('int', 2)
 AF_INET = ffi.cast('int', 2)
 AF_INET6 = ffi.cast('int', 10)
 NF_MARK_SET = ffi.cast('unsigned int', 1)
@@ -79,15 +84,26 @@ def py_callback(data, length):
     unpacked = bytes(ffi.unpack(data, length))
     packet = scapy.layers.inet.IP(unpacked)
     opensnitch.dns.add_response(packet)
-    conn = opensnitch.connection.parse(packet)
-    src, dst, hostname, src_port, dst_port, proto, pid, path, args = conn
-    1/0
-    if (src == dst == '127.0.0.1'
-        or proto == 'hopopt'):
-        logging.debug(f'allow: {opensnitch.connection.format(conn)}')
-    if True:
-        logging.info(f'allow: {opensnitch.connection.format(conn)}')
-        return ALLOW
+    try:
+        conn = opensnitch.connection.parse(packet)
+    except KeyError:
+        checksum = hashlib.md5(unpacked).hexdigest()
+        repeats[checksum] += 1
+        if repeats[checksum] > 2:
+            logging.info(f'failed to parse packet {checksum}, dropping after 10 repeats')
+            return DENY
+        else:
+            logging.info(f'repeating packet {checksum} for the {repeats[checksum]} time')
+            return REPEAT
     else:
-        logging.info(f'deny: {opensnitch.connection.format(conn)}')
-        return DENY
+        src, dst, hostname, src_port, dst_port, proto, pid, path_and_args = conn
+        if (src == dst == '127.0.0.1'
+            or proto == 'hopopt'):
+            # logging.info(f'allow: {opensnitch.connection.format(conn)}')
+            pass
+        if True:
+            logging.info(f'allow: {opensnitch.connection.format(conn)}')
+            return ALLOW
+        else:
+            logging.info(f'deny: {opensnitch.connection.format(conn)}')
+            return DENY

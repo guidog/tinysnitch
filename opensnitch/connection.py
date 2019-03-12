@@ -22,6 +22,8 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
 import opensnitch.dns
+import opensnitch.bpftrace
+import logging
 
 def ip_proto(pkt):
     proto_field = pkt.get_field('proto')
@@ -31,19 +33,30 @@ def parse(packet):
     src = packet.src
     dst = packet.dst
     hostname = opensnitch.dns.get_hostname(dst)
-    src_port = dst_port = proto = pid = path = args = ''
+    src_port = dst_port = proto = pid = path_and_args = ''
     proto = packet.get_field('proto').i2s[packet.proto]
     if 'TCP' in packet or 'UDP' in packet:
         ip = packet['IP']
         src_port = ip.sport
         dst_port = ip.dport
-    if proto in {'tcp', 'udp'}:
-
-        # pid = opensnitch.proc.get_pid_by_connection(src, src_port, dst, dst_port, proto)
-        # path, args = opensnitch.proc.get_app_path_and_cmdline(pid)
-        pass
-    return src, dst, hostname, src_port, dst_port, proto, pid, path, args
+    if 'UDP' in packet:
+        src_port, dst_port = dst_port, src_port
+        src, dst = dst, src
+    if proto in {'tcp',
+                 'udp'
+                 }:
+        try:
+            pid = opensnitch.bpftrace.pids[(src, src_port, dst, dst_port)]
+        except KeyError:
+            logging.info(f'missed pids lookup of: {src, dst, hostname, src_port, dst_port, proto, pid, path_and_args}')
+            raise
+        try:
+            path_and_args  = opensnitch.bpftrace.paths[pid]
+        except KeyError:
+            logging.info(f'missed paths lookup of: {src, dst, hostname, src_port, dst_port, proto, pid, path_and_args}')
+            raise
+    return src, dst, hostname, src_port, dst_port, proto, pid, path_and_args
 
 def format(conn):
-    src, dst, hostname, src_port, dst_port, proto, pid, path, args = conn
-    return ' '.join(f'{src}:{src_port} => {hostname} {dst}:{dst_port} {proto} {pid} {path} {args}'.split())
+    src, dst, hostname, src_port, dst_port, proto, pid, path_and_args = conn
+    return ' '.join(f'{src}:{src_port} => {hostname} {dst}:{dst_port} {proto} {pid} {path_and_args}'.split())
