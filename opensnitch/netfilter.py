@@ -84,24 +84,25 @@ def py_callback(data, length):
     unpacked = bytes(ffi.unpack(data, length))
     packet = scapy.layers.inet.IP(unpacked)
     opensnitch.dns.add_response(packet)
+    conn = opensnitch.connection.parse(packet)
     try:
-        conn = opensnitch.connection.parse(packet)
+        conn = opensnitch.connection.add_meta(packet, conn)
     except KeyError:
         checksum = hashlib.md5(unpacked).hexdigest()
         repeats[checksum] += 1
         if repeats[checksum] > 2:
-            logging.info(f'failed to parse packet {checksum}, dropping after 2 repeats')
-            return DENY
+            logging.info(f'failed to add meta to {checksum} after 3 requeues')
+            logging.info(f'allow: {opensnitch.connection.format(conn)}')
+            return ALLOW
         else:
-            logging.info(f'repeating packet {checksum} for the {repeats[checksum]}th time')
+            logging.info(f'requeue packet {opensnitch.connection.format(conn)}')
             return REPEAT
     else:
         src, dst, hostname, src_port, dst_port, proto, pid, path, args = conn
         if (src == dst == '127.0.0.1' or proto == 'hopopt'):
             logging.info(f'allow: {opensnitch.connection.format(conn)}')
         if True:
-            if proto == 'tcp':
-                logging.info(f'allow: {opensnitch.connection.format(conn)}')
+            logging.info(f'allow: {opensnitch.connection.format(conn)}')
             return ALLOW
         else:
             logging.info(f'deny: {opensnitch.connection.format(conn)}')

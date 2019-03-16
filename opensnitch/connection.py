@@ -41,7 +41,11 @@ def parse(packet):
         ip = packet['IP']
         src_port = ip.sport
         dst_port = ip.dport
-    if proto == 'udp' and src_port == 53: # duplicate flipped udp traces from bpftrace
+    return src, dst, hostname, src_port, dst_port, proto, pid, path, args
+
+def add_meta(packet, conn):
+    src, dst, hostname, src_port, dst_port, proto, _pid, _path, _args = conn
+    if proto == 'udp' and src_port == 53: # duplicate flipped udp trace from bpftrace
         src_port, dst_port = dst_port, src_port
         src, dst = dst, src
     if proto in {'tcp', 'udp'}:
@@ -65,4 +69,4 @@ def parse(packet):
 
 def format(conn):
     src, dst, hostname, src_port, dst_port, proto, pid, path, args = conn
-    return ' '.join(f'{src}:{src_port} => {hostname} {dst}:{dst_port} {proto} {pid} {path, args}'.split())
+    return ' '.join(f'{proto} {src}:{src_port} => {hostname} {dst}:{dst_port} [{pid} {path + args}]'.split())

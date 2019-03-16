@@ -107,7 +107,7 @@ def tail():
                     if r == b'(fault)':
                         break
                     arg_string += b' ' + r
-                arg_string = arg_string.replace(b'"', b'')
+                arg_string = arg_string.replace(b'"', b'').decode('utf-8')
                 comms[pid] = (comm, arg_string)
 
             elif b'sched_process_exit:' == probe:
@@ -131,16 +131,3 @@ def tail():
                     filenames[child_pid] = filenames[pid]
                 except KeyError:
                     pass
-
-            # else:
-                # logging.info(f'kprobe unknown: {probe} {pid} {rest}')
-
-
-
-
-
-
-
-
-
-                    # elif token == 'opensnitch_exec_probe:':

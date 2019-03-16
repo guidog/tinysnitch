@@ -61,8 +61,6 @@ def add_response(packet):
             if addr:
                 logging.info(f'dns: {addr} => {name}')
                 hosts[addr] = name
-            else:
-                logging.info(f'dns: {name}')
 
 def get_hostname(address):
     return hosts.get(address, '')

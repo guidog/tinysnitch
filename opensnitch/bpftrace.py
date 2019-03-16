@@ -58,7 +58,6 @@ def _monitor(proc):
 def _tail(proc):
     while True:
         line = proc.stdout.readline().decode('utf-8').rstrip()
-        logging.info(f'bpftrace got: {line}')
         if not line:
             break
         try:
