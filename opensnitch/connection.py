@@ -24,6 +24,7 @@
 import time
 import opensnitch.dns
 import opensnitch.bpftrace
+import opensnitch.kprobe
 import logging
 
 def ip_proto(pkt):
@@ -34,7 +35,7 @@ def parse(packet):
     src = packet.src
     dst = packet.dst
     hostname = opensnitch.dns.get_hostname(dst)
-    src_port = dst_port = proto = pid = path_and_args = ''
+    src_port = dst_port = proto = pid = path = args = ''
     proto = packet.get_field('proto').i2s[packet.proto]
     if 'TCP' in packet or 'UDP' in packet:
         ip = packet['IP']
@@ -53,12 +54,18 @@ def parse(packet):
             raise
         assert time.monotonic() - start < 60, 'stale lookup of: {src, src_port, dst, dst_port}'
         try:
-            path_and_args = opensnitch.bpftrace.paths[pid]
+            _path, args = opensnitch.kprobe.comms[pid]
         except KeyError:
-            logging.info(f'paths missed lookup: {pid}')
+            logging.info(f'comms missed lookup: {pid}')
+            __import__('pprint').pprint(opensnitch.kprobe.comms)
             raise
-    return src, dst, hostname, src_port, dst_port, proto, pid, path_and_args
+        try:
+            path = opensnitch.kprobe.filenames[pid]
+        except KeyError:
+            logging.info(f'filenames missed lookup: {pid}')
+            raise
+    return src, dst, hostname, src_port, dst_port, proto, pid, path, args
 
 def format(conn):
-    src, dst, hostname, src_port, dst_port, proto, pid, path_and_args = conn
-    return ' '.join(f'{src}:{src_port} => {hostname} {dst}:{dst_port} {proto} {pid} {path_and_args}'.split())
+    src, dst, hostname, src_port, dst_port, proto, pid, path, args = conn
+    return ' '.join(f'{src}:{src_port} => {hostname} {dst}:{dst_port} {proto} {pid} {path, args}'.split())

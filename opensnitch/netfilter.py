@@ -90,13 +90,13 @@ def py_callback(data, length):
         checksum = hashlib.md5(unpacked).hexdigest()
         repeats[checksum] += 1
         if repeats[checksum] > 2:
-            logging.info(f'failed to parse packet {checksum}, dropping after 10 repeats')
+            logging.info(f'failed to parse packet {checksum}, dropping after 2 repeats')
             return DENY
         else:
             logging.info(f'repeating packet {checksum} for the {repeats[checksum]}th time')
             return REPEAT
     else:
-        src, dst, hostname, src_port, dst_port, proto, pid, path_and_args = conn
+        src, dst, hostname, src_port, dst_port, proto, pid, path, args = conn
         if (src == dst == '127.0.0.1'
             or proto == 'hopopt'):
             # logging.info(f'allow: {opensnitch.connection.format(conn)}')

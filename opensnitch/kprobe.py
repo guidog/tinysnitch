@@ -21,8 +21,13 @@
 # or write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
+import logging
 import contextlib
 import subprocess
+import opensnitch.bpftrace
+
+comms = {}
+filenames = {}
 
 co = lambda *a: subprocess.check_output(' '.join(map(str, a)), shell=True, executable='/bin/bash').decode('utf-8').strip()
 
@@ -44,6 +49,7 @@ for e in sub_events:
     events[e.split('/')[-1]] = event_file_format % e
 
 def enable():
+    disable()
     for name, path in events.items():
         with open(path, 'w') as f:
             f.write('1')
@@ -60,6 +66,8 @@ def ignore_exceptions():
         pass
 
 def disable():
+    with open(events_pipe_file, 'wb') as f:
+        f.write(b'')
     for name, path in events.items():
         with ignore_exceptions():
             with open(path, 'w') as f:
@@ -71,18 +79,69 @@ def disable():
         with open(system_probes_file, 'w') as f:
             f.write(f'-:{probe_name}')
 
-def tail():
-    pipe = open(events_pipe_file, 'rb')
-    for line in pipe:
-        try:
-            print(line.strip().decode('utf-8'))
-        except:
-            print(line.strip())
-
 def start():
-    disable()
-    try:
-        enable()
-        tail()
-    finally:
-        disable()
+    enable()
+    opensnitch.bpftrace.run_thread(tail)
+
+def tail():
+    with open(events_pipe_file, 'rb') as pipe:
+        for line in pipe:
+            print(line)
+            parts = line.split()
+
+            # try:
+            #     name_pid, _, _, _, probe, _, *rest = parts
+            # except ValueError:
+            #     logging.error(f'not enough parts: {line}')
+            #     continue
+            # pid = name_pid.split(b'-')[-1]
+            # if b'opensnitch_exec_probe:' == probe:
+            #     logging.info(f'got: {pid} {rest}')
+
+            # try:
+            #     line = line.decode('utf-8').rstrip()
+            # except UnicodeDecodeError:
+            #     logging.info(f'failed to decode {line}')
+            # else:
+            #     try:
+            #         token, *line = line.split()[4:]
+            #     except ValueError:
+            #         logging.info(f'bad kprobe line: {line}')
+            #     else:
+            #         if False:
+            #             pass
+
+                    # elif token == 'sched_process_exit:':
+                    #     _comm, pid, _prio = line
+                    #     pid = pid.split('=')[-1]
+                    #     comms.pop(pid, None)
+                    #     filenames.pop(pid, None)
+
+                    # elif token == 'sched_process_fork:':
+                    #     comm, pid, _child_comm, child_pid = line
+                    #     comm = comm.split('=')[-1]
+                    #     pid = pid.split('=')[-1]
+                    #     child_pid = child_pid.split('=')[-1]
+                    #     if pid in comms:
+                    #         comms[child_pid] = comms[pid]
+                    #     else:
+                    #         comms[child_pid] = comm, ''
+                    #     if pid in filenames:
+                    #         filenames[child_pid] = filenames[pid]
+
+                    # elif token == 'sched_process_exec:':
+                    #     filename, pid, _old_pid = line
+                    #     filename = filename.split('=')[-1]
+                    #     pid = pid.split('=')[-1]
+                    #     filenames[pid] = filename
+
+                    # elif token == 'opensnitch_exec_probe:':
+                        # logging.info(line)
+                        # _, path, *args = line
+                        # path = path.split('=')[-1].replace('"', '')
+                        # arg_string = ''
+                        # for arg in args:
+                        #     if '(fault)' in arg:
+                        #         break
+                        #     arg_string += ' ' + arg.split('=')[-1].replace('"', '')
+                        # comms[pid] = (path, arg_string)
