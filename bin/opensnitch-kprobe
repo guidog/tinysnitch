@@ -1,0 +1,4 @@
+#!/usr/bin/env pypy3
+import opensnitch.kprobe
+
+opensnitch.kprobe.start()

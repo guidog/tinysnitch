@@ -1,6 +1,0 @@
-#!/usr/bin/env bpftrace
-
-tracepoint:sched:sched_process_exec
-{
-    printf("exec: %d %s\n", pid, comm);
-}
