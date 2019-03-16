@@ -93,7 +93,7 @@ def py_callback(data, length):
             logging.info(f'failed to parse packet {checksum}, dropping after 10 repeats')
             return DENY
         else:
-            logging.info(f'repeating packet {checksum} for the {repeats[checksum]} time')
+            logging.info(f'repeating packet {checksum} for the {repeats[checksum]}th time')
             return REPEAT
     else:
         src, dst, hostname, src_port, dst_port, proto, pid, path_and_args = conn
@@ -102,7 +102,8 @@ def py_callback(data, length):
             # logging.info(f'allow: {opensnitch.connection.format(conn)}')
             pass
         if True:
-            logging.info(f'allow: {opensnitch.connection.format(conn)}')
+            if proto == 'tcp':
+                logging.info(f'allow: {opensnitch.connection.format(conn)}')
             return ALLOW
         else:
             logging.info(f'deny: {opensnitch.connection.format(conn)}')

@@ -47,11 +47,6 @@ def _run_thread(fn, *a, **kw):
     obj.daemon = True
     obj.start()
 
-def start():
-    proc = subprocess.Popen(['sudo', 'stdbuf', '-o0', 'opensnitch-bpftrace-inet-connect'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    _run_thread(monitor, proc)
-    _run_thread(tail, proc)
-
 def monitor(proc):
     while True:
         if proc.poll() is not None:
@@ -61,36 +56,97 @@ def monitor(proc):
     logging.error('monitor exited prematurely')
     sys.exit(1)
 
-def tail(proc):
+def tail_tcp_udp(proc):
     while True:
         line = proc.stdout.readline().decode('utf-8')
         if not line:
             break
-        line = line.rstrip()
         try:
-            token, line = line.split(': ', 1)
+            token, line = line.rstrip().split(': ', 1)
         except ValueError:
-            logging.info(f'tail skipping: {line}')
+            logging.info(f'trace tcp udp skipping: {line.rstrip()}')
         else:
-            # TODO how to deal with this being updated after netfilter callback
-            # is fired, and hitting stale data?
-            if token == 'inet':
-                try:
-                    pid, _comm, saddr, sport, daddr, dport = line.split()
-                except ValueError:
-                    logging.error(f'bad inet line: {[line]}')
-                else:
-                    pids[(daddr, int(dport), saddr, int(sport))] = pid
-                    logging.info(f'inet: {line}')
-            elif token == 'exec':
-                try:
-                    pid, path_and_args = line.split(None, 1)
-                except ValueError:
-                    logging.error(f'bad exec line: {[line]}')
-                else:
-                    paths[pid] = path_and_args
-                    # logging.info(f'exec: {line}')
+            try:
+                pid, _comm, saddr, sport, daddr, dport = line.split()
+            except ValueError:
+                logging.error(f'bad inet line: {[line]}')
             else:
-                assert False, f'should never happen, got: {[token]}'
+                pids[(daddr, int(dport), saddr, int(sport))] = pid, time.monotonic()
+                # logging.info(f'inet: {line}')
     logging.error('tail exited prematurely')
     sys.exit(1)
+
+def tail_execve(proc):
+    while True:
+        line = proc.stdout.readline().decode('utf-8')
+        if not line:
+            break
+        try:
+            token, line = line.rstrip().split(': ', 1)
+        except ValueError:
+            logging.info(f'trace execve skipping: {line.rstrip()}')
+        else:
+            try:
+                pid, path_and_args = line.split(None, 1)
+            except ValueError:
+                logging.error(f'bad execve line: {[line]}')
+            else:
+                paths[pid] = path_and_args
+                # logging.info(f'execve: {line}')
+    logging.error('tail exited prematurely')
+    sys.exit(1)
+
+def tail_exec(proc):
+    while True:
+        line = proc.stdout.readline().decode('utf-8')
+        if not line:
+            break
+        try:
+            token, line = line.rstrip().split(': ', 1)
+        except ValueError:
+            logging.info(f'trace fork skipping: {line.rstrip()}')
+        else:
+            try:
+                pid, path = line.split(None, 1)
+            except ValueError:
+                logging.error(f'bad fork line: {[line]}')
+            else:
+                if pid not in paths:
+                    paths[pid] = path
+    logging.error('tail exited prematurely')
+    sys.exit(1)
+
+def tail_exit(proc):
+    while True:
+        line = proc.stdout.readline().decode('utf-8')
+        if not line:
+            break
+        try:
+            token, line = line.rstrip().split(': ', 1)
+        except ValueError:
+            logging.info(f'trace exit skipping: {line.rstrip()}')
+        else:
+            try:
+                pid, path = line.split(None, 1)
+            except ValueError:
+                logging.error(f'bad exit line: {[line]}')
+            else:
+                paths.pop(pid, None)
+    logging.error('tail exited prematurely')
+    sys.exit(1)
+
+traces = [
+    ('execve', tail_execve),
+    ('fork', tail_exec),
+    ('exec', tail_exec),
+    ('tcp', tail_tcp_udp),
+    ('udp', tail_tcp_udp),
+    # ('exit', tail_exit),
+]
+
+def start():
+    for trace, tail in traces:
+        proc = subprocess.Popen(['sudo', 'stdbuf', '-o0', f'opensnitch-bpftrace-{trace}'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        _run_thread(monitor, proc)
+        _run_thread(tail, proc)
+        logging.info(f'started trace: {trace}')

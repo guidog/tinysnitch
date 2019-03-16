@@ -1,0 +1,24 @@
+#!/usr/bin/env bpftrace
+/*
+ * based on: https://github.com/iovisor/bpftrace/blob/182923e64c0bad8784ff38cdeae2040f90172676/tools/tcpconnect.bt
+ * Copyright (c) 2018 Dale Hamel.
+ * Licensed under the Apache License, Version 2.0 (the "License")
+ *
+ */
+
+#include <net/sock.h>
+
+kprobe:udp_sendmsg
+{
+  $sk = ((sock *) arg0);
+  $inet_family = $sk->__sk_common.skc_family;
+  $af_inet = 2;
+  if ($inet_family == $af_inet) {
+    $daddr = $sk->__sk_common.skc_daddr;
+    $saddr = $sk->__sk_common.skc_rcv_saddr;
+    $lport = $sk->__sk_common.skc_num;
+    $dport = $sk->__sk_common.skc_dport;
+    $dport = ($dport >> 8) | (($dport << 8) & 0x00FF00); // Destination port is big endian, it must be flipped
+    printf("inet: %d %s %s %d %s %d\n", pid, comm, ntop($af_inet, $daddr), $dport, ntop($af_inet, $saddr), $lport);
+  }
+}

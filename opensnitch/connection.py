@@ -21,6 +21,7 @@
 # or write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
+import time
 import opensnitch.dns
 import opensnitch.bpftrace
 import logging
@@ -43,17 +44,18 @@ def parse(packet):
         src_port, dst_port = dst_port, src_port
         src, dst = dst, src
     if proto in {'tcp',
-                 'udp'
+                 # 'udp'
                  }:
         try:
-            pid = opensnitch.bpftrace.pids[(src, src_port, dst, dst_port)]
+            pid, start = opensnitch.bpftrace.pids[(src, src_port, dst, dst_port)]
         except KeyError:
-            logging.info(f'missed pids lookup of: {src, dst, hostname, src_port, dst_port, proto, pid, path_and_args}')
+            logging.info(f'pids missed lookup: {src}:{src_port} => {dst}:{dst_port} {proto}')
             raise
+        assert time.monotonic() - start < 60, 'stale lookup of: {src, src_port, dst, dst_port}'
         try:
-            path_and_args  = opensnitch.bpftrace.paths[pid]
+            path_and_args = opensnitch.bpftrace.paths[pid]
         except KeyError:
-            logging.info(f'missed paths lookup of: {src, dst, hostname, src_port, dst_port, proto, pid, path_and_args}')
+            logging.info(f'paths missed lookup: {pid}')
             raise
     return src, dst, hostname, src_port, dst_port, proto, pid, path_and_args
 
