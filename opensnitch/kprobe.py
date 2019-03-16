@@ -86,62 +86,61 @@ def start():
 def tail():
     with open(events_pipe_file, 'rb') as pipe:
         for line in pipe:
-            print(line)
+            # print(line)
             parts = line.split()
 
-            # try:
-            #     name_pid, _, _, _, probe, _, *rest = parts
-            # except ValueError:
-            #     logging.error(f'not enough parts: {line}')
-            #     continue
-            # pid = name_pid.split(b'-')[-1]
-            # if b'opensnitch_exec_probe:' == probe:
-            #     logging.info(f'got: {pid} {rest}')
+            try:
+                name_pid, _, _, _, probe, *rest = parts
+            except ValueError:
+                logging.error(f'not enough parts: {line}')
+                continue
+            pid = name_pid.split(b'-')[-1].decode('utf-8')
 
-            # try:
-            #     line = line.decode('utf-8').rstrip()
-            # except UnicodeDecodeError:
-            #     logging.info(f'failed to decode {line}')
+            if False:
+                pass
+
+            elif b'opensnitch_exec_probe:' == probe:
+                arg_string = b''
+                comm = rest[1].split(b'=')[-1].replace(b'"', b'').decode('utf-8')
+                for r in rest[2:]:
+                    r = r.split(b'=')[-1]
+                    if r == b'(fault)':
+                        break
+                    arg_string += b' ' + r
+                arg_string = arg_string.replace(b'"', b'')
+                comms[pid] = (comm, arg_string)
+
+            elif b'sched_process_exit:' == probe:
+                comms.pop(pid, None)
+                filenames.pop(pid, None)
+
+            elif b'sched_process_exec:' == probe:
+                filename, _pid, _old_pid = rest
+                filename = filename.split(b'=')[-1].decode('utf-8')
+                filenames[pid] = filename
+
+            elif b'sched_process_fork:' == probe:
+                comm, _pid, _child_comm, child_pid = rest
+                comm = comm.split(b'=')[-1].decode('utf-8')
+                child_pid = child_pid.split(b'=')[-1].decode('utf-8')
+                try:
+                    comms[child_pid] = comms[pid]
+                except KeyError:
+                    comms[child_pid] = comm, ''
+                try:
+                    filenames[child_pid] = filenames[pid]
+                except KeyError:
+                    pass
+
             # else:
-            #     try:
-            #         token, *line = line.split()[4:]
-            #     except ValueError:
-            #         logging.info(f'bad kprobe line: {line}')
-            #     else:
-            #         if False:
-            #             pass
+                # logging.info(f'kprobe unknown: {probe} {pid} {rest}')
 
-                    # elif token == 'sched_process_exit:':
-                    #     _comm, pid, _prio = line
-                    #     pid = pid.split('=')[-1]
-                    #     comms.pop(pid, None)
-                    #     filenames.pop(pid, None)
 
-                    # elif token == 'sched_process_fork:':
-                    #     comm, pid, _child_comm, child_pid = line
-                    #     comm = comm.split('=')[-1]
-                    #     pid = pid.split('=')[-1]
-                    #     child_pid = child_pid.split('=')[-1]
-                    #     if pid in comms:
-                    #         comms[child_pid] = comms[pid]
-                    #     else:
-                    #         comms[child_pid] = comm, ''
-                    #     if pid in filenames:
-                    #         filenames[child_pid] = filenames[pid]
 
-                    # elif token == 'sched_process_exec:':
-                    #     filename, pid, _old_pid = line
-                    #     filename = filename.split('=')[-1]
-                    #     pid = pid.split('=')[-1]
-                    #     filenames[pid] = filename
+
+
+
+
+
 
                     # elif token == 'opensnitch_exec_probe:':
-                        # logging.info(line)
-                        # _, path, *args = line
-                        # path = path.split('=')[-1].replace('"', '')
-                        # arg_string = ''
-                        # for arg in args:
-                        #     if '(fault)' in arg:
-                        #         break
-                        #     arg_string += ' ' + arg.split('=')[-1].replace('"', '')
-                        # comms[pid] = (path, arg_string)

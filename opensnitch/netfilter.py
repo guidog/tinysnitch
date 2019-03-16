@@ -97,10 +97,8 @@ def py_callback(data, length):
             return REPEAT
     else:
         src, dst, hostname, src_port, dst_port, proto, pid, path, args = conn
-        if (src == dst == '127.0.0.1'
-            or proto == 'hopopt'):
-            # logging.info(f'allow: {opensnitch.connection.format(conn)}')
-            pass
+        if (src == dst == '127.0.0.1' or proto == 'hopopt'):
+            logging.info(f'allow: {opensnitch.connection.format(conn)}')
         if True:
             if proto == 'tcp':
                 logging.info(f'allow: {opensnitch.connection.format(conn)}')

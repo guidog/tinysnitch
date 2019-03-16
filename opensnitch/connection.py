@@ -41,23 +41,20 @@ def parse(packet):
         ip = packet['IP']
         src_port = ip.sport
         dst_port = ip.dport
-    if 'UDP' in packet:
+    if proto == 'udp' and src_port == 53: # duplicate flipped udp traces from bpftrace
         src_port, dst_port = dst_port, src_port
         src, dst = dst, src
-    if proto in {'tcp',
-                 # 'udp'
-                 }:
+    if proto in {'tcp', 'udp'}:
         try:
             pid, start = opensnitch.bpftrace.pids[(src, src_port, dst, dst_port)]
         except KeyError:
-            logging.info(f'pids missed lookup: {src}:{src_port} => {dst}:{dst_port} {proto}')
+            logging.info(f'pids missed lookup: {(src, src_port, dst, dst_port)} {proto}')
             raise
         assert time.monotonic() - start < 60, 'stale lookup of: {src, src_port, dst, dst_port}'
         try:
-            _path, args = opensnitch.kprobe.comms[pid]
+            path, args = opensnitch.kprobe.comms[pid]
         except KeyError:
             logging.info(f'comms missed lookup: {pid}')
-            __import__('pprint').pprint(opensnitch.kprobe.comms)
             raise
         try:
             path = opensnitch.kprobe.filenames[pid]
