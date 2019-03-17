@@ -25,7 +25,6 @@ import opensnitch.kprobe
 import subprocess
 
 iptables_rules = [
-    "INPUT --protocol udp --sport 53 -j NFQUEUE --queue-num 0",
     "OUTPUT -t mangle -m conntrack --ctstate NEW -j NFQUEUE --queue-num 0",
     "INPUT -t mangle -m conntrack --ctstate NEW -j NFQUEUE --queue-num 0",
     "OUTPUT --protocol tcp -m mark --mark 101285 -j REJECT",
