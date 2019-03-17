@@ -110,5 +110,4 @@ def py_callback(data, length):
         logging.info(f'allow: {opensnitch.connection.format(conn)}')
     else:
         logging.info(f'deny: {opensnitch.connection.format(conn)}')
-    opensnitch.bpftrace.free(conn)
     return action

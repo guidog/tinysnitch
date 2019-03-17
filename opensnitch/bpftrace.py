@@ -26,6 +26,7 @@ import functools
 import os
 import signal
 
+seconds = 15
 pids = {}
 
 def _exceptions_kill_parent(decoratee):
@@ -71,20 +72,27 @@ def _tail(proc):
                 logging.error(f'bad bpftrace line: {[line]}')
             else:
                 sport, dport = int(sport), int(dport)
-                pids[(daddr, dport, saddr, sport)] = pid
-                pids[(saddr, sport, daddr, dport)] = pid
+                start = time.monotonic()
+                pids[(daddr, dport, saddr, sport)] = pid, start
+                pids[(saddr, sport, daddr, dport)] = pid, start
                 # logging.info(f'bpftrace: {line}')
     logging.error('tail exited prematurely')
     sys.exit(1)
 
-def free(conn):
-    src, dst, src_port, dst_port, proto, pid, path, args = conn
-    pids.pop((dst, dst_port, src, src_port), None)
-    pids.pop((src, src_port, dst, dst_port), None)
+def _gc():
+    while True:
+        now = time.monotonic()
+        for k, (_pid, start) in list(pids.items()):
+            if now - start > seconds:
+                del pids[k]
+        time.sleep(1)
+    logging.error('gc exited prematurely')
+    sys.exit(1)
 
 def start():
     for trace in ['tcp', 'udp']:
         proc = subprocess.Popen(['sudo', 'stdbuf', '-o0', f'opensnitch-bpftrace-{trace}'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        run_thread(_gc)
         run_thread(_monitor, proc)
         run_thread(_tail, proc)
         logging.info(f'started trace: {trace}')

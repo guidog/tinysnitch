@@ -54,7 +54,6 @@ def add_meta(packet, conn):
         except KeyError:
             logging.info(f'pids missed lookup: {(src, src_port, dst, dst_port)} {proto}')
             raise
-        assert time.monotonic() - start < 60, 'stale lookup of: {src, src_port, dst, dst_port}'
         try:
             path, args = opensnitch.kprobe.comms[pid]
         except KeyError:

@@ -1,5 +1,5 @@
 #!/bin/bash
-cd $(dirname $(dirname $0))
+cd $(dirname $(dirname $(realpath $0)))
 
 find -type f \
      | grep -v -e .backup -e .git -e egg -e pycache \
