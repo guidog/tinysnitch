@@ -70,10 +70,17 @@ def _tail(proc):
             except ValueError:
                 logging.error(f'bad bpftrace line: {[line]}')
             else:
-                pids[(daddr, int(dport), saddr, int(sport))] = pid, time.monotonic()
+                sport, dport = int(sport), int(dport)
+                pids[(daddr, dport, saddr, sport)] = pid
+                pids[(saddr, sport, daddr, dport)] = pid
                 # logging.info(f'bpftrace: {line}')
     logging.error('tail exited prematurely')
     sys.exit(1)
+
+def free(conn):
+    src, dst, src_port, dst_port, proto, pid, path, args = conn
+    pids.pop((dst, dst_port, src, src_port), None)
+    pids.pop((src, src_port, dst, dst_port), None)
 
 def start():
     for trace in ['tcp', 'udp']:

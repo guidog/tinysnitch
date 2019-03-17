@@ -34,20 +34,17 @@ def ip_proto(pkt):
 def parse(packet):
     src = packet.src
     dst = packet.dst
-    hostname = opensnitch.dns.get_hostname(dst)
-    src_port = dst_port = proto = pid = path = args = ''
+    src_port = dst_port = proto = path = args = ''
+    pid = '?'
     proto = packet.get_field('proto').i2s[packet.proto]
     if 'TCP' in packet or 'UDP' in packet:
         ip = packet['IP']
         src_port = ip.sport
         dst_port = ip.dport
-    return src, dst, hostname, src_port, dst_port, proto, pid, path, args
+    return src, dst, src_port, dst_port, proto, pid, path, args
 
 def add_meta(packet, conn):
-    src, dst, hostname, src_port, dst_port, proto, _pid, _path, _args = conn
-    if proto == 'udp' and src_port == 53: # duplicate flipped udp trace from bpftrace
-        src_port, dst_port = dst_port, src_port
-        src, dst = dst, src
+    src, dst, src_port, dst_port, proto, _pid, _path, _args = conn
     if proto in {'tcp', 'udp'}:
         try:
             pid, start = opensnitch.bpftrace.pids[(src, src_port, dst, dst_port)]
@@ -65,8 +62,13 @@ def add_meta(packet, conn):
         except KeyError:
             logging.info(f'filenames missed lookup: {pid}')
             raise
-    return src, dst, hostname, src_port, dst_port, proto, pid, path, args
+    return src, dst, src_port, dst_port, proto, pid, path, args
 
 def format(conn):
-    src, dst, hostname, src_port, dst_port, proto, pid, path, args = conn
-    return ' '.join(f'{proto} {src}:{src_port} => {hostname} {dst}:{dst_port} [{pid} {path + args}]'.split())
+    src, dst, src_port, dst_port, proto, pid, path, args = conn
+    src = opensnitch.dns.get_hostname(src)
+    dst = opensnitch.dns.get_hostname(dst)
+    if dst == opensnitch.dns.hostname:
+        return ' '.join(f'{proto} | {dst}:{dst_port} <- {src}:{src_port} | {pid} {path + args}'.split())
+    else:
+        return ' '.join(f'{proto} | {src}:{src_port} -> {dst}:{dst_port} | {pid} {path + args}'.split())

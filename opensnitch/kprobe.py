@@ -95,14 +95,14 @@ def tail():
             try:
                 pid = name_pid.split(b'-')[-1].decode('utf-8')
                 if b'opensnitch_exec_probe:' == probe:
-                    arg_string = b''
+                    arg_string = [b' ']
                     comm = rest[1].split(b'=')[-1].replace(b'"', b'').decode('utf-8')
                     for r in rest[2:]:
                         r = r.split(b'=')[-1]
                         if r == b'(fault)':
                             break
-                        arg_string += b' ' + r
-                    arg_string = arg_string.replace(b'"', b'').decode('utf-8')
+                        arg_string.append(r)
+                    arg_string = b' '.join(arg_string).replace(b'"', b'').decode('utf-8')
                     comms[pid] = (comm, arg_string)
                 elif b'sched_process_exit:' == probe:
                     comms.pop(pid, None)

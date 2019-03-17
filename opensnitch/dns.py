@@ -28,6 +28,8 @@ from scapy.layers.inet import UDP
 
 co = lambda *a: subprocess.check_output(' '.join(map(str, a)), shell=True, executable='/bin/bash').decode('utf-8').strip()
 
+with open('/etc/hostname') as f:
+    hostname = f.read().strip()
 hosts = {}
 
 def _decode(x):
@@ -37,13 +39,11 @@ def _decode(x):
         return x
 
 def populate_localhosts():
-    with open('/etc/hostname') as f:
-        hostname = f.read().strip()
     for line in co('ip a | grep inet').splitlines():
         _, addr, *_ = line.strip().split()
         addr = addr.split('/')[0]
         hosts[addr] = hostname
-        logging.info(f'dns: {addr} => {hostname}')
+        logging.info(f'dns: {hostname} {addr}')
 
 def parse_dns(packet):
     udp = packet['UDP']
@@ -59,8 +59,8 @@ def add_response(packet):
     if UDP in packet and DNS in packet:
         for name, addr in parse_dns(packet):
             if addr:
-                logging.info(f'dns: {addr} => {name}')
+                logging.info(f'dns: {name} {addr}')
                 hosts[addr] = name
 
 def get_hostname(address):
-    return hosts.get(address, '')
+    return hosts.get(address, address)

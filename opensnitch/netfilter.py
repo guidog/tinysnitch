@@ -81,10 +81,13 @@ def destroy(nfq_q_handle, nfq_handle):
 
 @ffi.def_extern()
 def py_callback(data, length):
+    logging.info('')
+    logging.info(f'sizes: pids={len(opensnitch.bpftrace.pids)} comms={len(opensnitch.kprobe.comms)} filenames={len(opensnitch.kprobe.filenames)}')
     unpacked = bytes(ffi.unpack(data, length))
     packet = scapy.layers.inet.IP(unpacked)
     opensnitch.dns.add_response(packet)
     conn = opensnitch.connection.parse(packet)
+    action = ALLOW
     try:
         conn = opensnitch.connection.add_meta(packet, conn)
     except KeyError:
@@ -92,18 +95,20 @@ def py_callback(data, length):
         repeats[checksum] += 1
         if repeats[checksum] > 2:
             logging.info(f'failed to add meta to {checksum} after 3 requeues')
-            logging.info(f'allow: {opensnitch.connection.format(conn)}')
-            return ALLOW
+            action = ALLOW
         else:
-            logging.info(f'requeue packet {opensnitch.connection.format(conn)}')
-            return REPEAT
+            action = REPEAT
     else:
-        src, dst, hostname, src_port, dst_port, proto, pid, path, args = conn
+        src, dst, src_port, dst_port, proto, pid, path, args = conn
         if (src == dst == '127.0.0.1' or proto == 'hopopt'):
-            logging.info(f'allow: {opensnitch.connection.format(conn)}')
-        if True:
-            logging.info(f'allow: {opensnitch.connection.format(conn)}')
-            return ALLOW
+            action = ALLOW
+        elif True:
+            action = ALLOW
         else:
-            logging.info(f'deny: {opensnitch.connection.format(conn)}')
-            return DENY
+            action = DENY
+    if action == ALLOW:
+        logging.info(f'allow: {opensnitch.connection.format(conn)}')
+    else:
+        logging.info(f'deny: {opensnitch.connection.format(conn)}')
+    opensnitch.bpftrace.free(conn)
+    return action
