@@ -1,0 +1,6 @@
+#!/usr/bin/env bpftrace
+
+tracepoint:sched:sched_process_exit
+{
+    printf("exit: %d %s\n", pid, comm);
+}

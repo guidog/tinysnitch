@@ -90,9 +90,68 @@ def _gc():
     sys.exit(1)
 
 def start():
+    run_thread(_gc)
     for trace in ['tcp', 'udp']:
         proc = subprocess.Popen(['sudo', 'stdbuf', '-o0', f'opensnitch-bpftrace-{trace}'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        run_thread(_gc)
         run_thread(_monitor, proc)
         run_thread(_tail, proc)
         logging.info(f'started trace: {trace}')
+
+# def tail_execve(proc):
+#     while True:
+#         line = proc.stdout.readline().decode('utf-8')
+#         if not line:
+#             break
+#         try:
+#             token, line = line.rstrip().split(': ', 1)
+#         except ValueError:
+#             logging.info(f'trace execve skipping: {line.rstrip()}')
+#         else:
+#             try:
+#                 pid, path_and_args = line.split(None, 1)
+#             except ValueError:
+#                 logging.error(f'bad execve line: {[line]}')
+#             else:
+#                 paths[pid] = path_and_args
+#                 # logging.info(f'execve: {line}')
+#     logging.error('tail exited prematurely')
+#     sys.exit(1)
+
+# def tail_exec(proc):
+#     while True:
+#         line = proc.stdout.readline().decode('utf-8')
+#         if not line:
+#             break
+#         try:
+#             token, line = line.rstrip().split(': ', 1)
+#         except ValueError:
+#             logging.info(f'trace fork skipping: {line.rstrip()}')
+#         else:
+#             try:
+#                 pid, path = line.split(None, 1)
+#             except ValueError:
+#                 logging.error(f'bad fork line: {[line]}')
+#             else:
+#                 if pid not in paths:
+#                     paths[pid] = path
+#     logging.error('tail exited prematurely')
+#     sys.exit(1)
+
+# def tail_exit(proc):
+#     while True:
+#         line = proc.stdout.readline().decode('utf-8')
+#         if not line:
+#             break
+#         try:
+#             token, line = line.rstrip().split(': ', 1)
+#         except ValueError:
+#             logging.info(f'trace exit skipping: {line.rstrip()}')
+#         else:
+#             try:
+#                 pid, path = line.split(None, 1)
+#             except ValueError:
+#                 logging.error(f'bad exit line: {[line]}')
+#             else:
+#                 paths.pop(pid, None)
+#     logging.error('tail exited prematurely')
+#     sys.exit(1)
