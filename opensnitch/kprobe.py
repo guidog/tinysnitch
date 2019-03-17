@@ -86,48 +86,42 @@ def start():
 def tail():
     with open(events_pipe_file, 'rb') as pipe:
         for line in pipe:
-            # print(line)
             parts = line.split()
-
             try:
                 name_pid, _, _, _, probe, *rest = parts
             except ValueError:
                 logging.error(f'not enough parts: {line}')
                 continue
-            pid = name_pid.split(b'-')[-1].decode('utf-8')
-
-            if False:
-                pass
-
-            elif b'opensnitch_exec_probe:' == probe:
-                arg_string = b''
-                comm = rest[1].split(b'=')[-1].replace(b'"', b'').decode('utf-8')
-                for r in rest[2:]:
-                    r = r.split(b'=')[-1]
-                    if r == b'(fault)':
-                        break
-                    arg_string += b' ' + r
-                arg_string = arg_string.replace(b'"', b'').decode('utf-8')
-                comms[pid] = (comm, arg_string)
-
-            elif b'sched_process_exit:' == probe:
-                comms.pop(pid, None)
-                filenames.pop(pid, None)
-
-            elif b'sched_process_exec:' == probe:
-                filename, _pid, _old_pid = rest
-                filename = filename.split(b'=')[-1].decode('utf-8')
-                filenames[pid] = filename
-
-            elif b'sched_process_fork:' == probe:
-                comm, _pid, _child_comm, child_pid = rest
-                comm = comm.split(b'=')[-1].decode('utf-8')
-                child_pid = child_pid.split(b'=')[-1].decode('utf-8')
-                try:
-                    comms[child_pid] = comms[pid]
-                except KeyError:
-                    comms[child_pid] = comm, ''
-                try:
-                    filenames[child_pid] = filenames[pid]
-                except KeyError:
-                    pass
+            try:
+                pid = name_pid.split(b'-')[-1].decode('utf-8')
+                if b'opensnitch_exec_probe:' == probe:
+                    arg_string = b''
+                    comm = rest[1].split(b'=')[-1].replace(b'"', b'').decode('utf-8')
+                    for r in rest[2:]:
+                        r = r.split(b'=')[-1]
+                        if r == b'(fault)':
+                            break
+                        arg_string += b' ' + r
+                    arg_string = arg_string.replace(b'"', b'').decode('utf-8')
+                    comms[pid] = (comm, arg_string)
+                elif b'sched_process_exit:' == probe:
+                    comms.pop(pid, None)
+                    filenames.pop(pid, None)
+                elif b'sched_process_exec:' == probe:
+                    filename, _pid, _old_pid = rest
+                    filename = filename.split(b'=')[-1].decode('utf-8')
+                    filenames[pid] = filename
+                elif b'sched_process_fork:' == probe:
+                    comm, _pid, _child_comm, child_pid = rest
+                    comm = comm.split(b'=')[-1].decode('utf-8')
+                    child_pid = child_pid.split(b'=')[-1].decode('utf-8')
+                    try:
+                        comms[child_pid] = comms[pid]
+                    except KeyError:
+                        comms[child_pid] = comm, ''
+                    try:
+                        filenames[child_pid] = filenames[pid]
+                    except KeyError:
+                        pass
+            except UnicodeDecodeError:
+                logging.error(f'failed to utf-8 decode kprobe line: {line}')
