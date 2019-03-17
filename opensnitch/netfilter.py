@@ -100,7 +100,9 @@ def py_callback(data, length):
             action = REPEAT
     else:
         src, dst, src_port, dst_port, proto, pid, path, args = conn
-        if (src == dst == '127.0.0.1' or proto == 'hopopt'):
+        if False:
+            pass
+        elif (src == dst == '127.0.0.1' or proto == 'hopopt'):
             action = ALLOW
         elif True:
             action = ALLOW
@@ -108,6 +110,6 @@ def py_callback(data, length):
             action = DENY
     if action == ALLOW:
         logging.info(f'allow: {opensnitch.connection.format(conn)}')
-    else:
+    elif action == DENY:
         logging.info(f'deny: {opensnitch.connection.format(conn)}')
     return action
