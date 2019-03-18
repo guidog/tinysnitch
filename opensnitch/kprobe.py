@@ -90,7 +90,7 @@ def tail():
             try:
                 name_pid, _, _, _, probe, *rest = parts
             except ValueError:
-                logging.error(f'not enough parts: {line}')
+                logging.debug(f'bad kprobe line, not enough parts: {line}')
                 continue
             try:
                 pid = name_pid.split(b'-')[-1].decode('utf-8')
@@ -124,4 +124,4 @@ def tail():
                     except KeyError:
                         pass
             except UnicodeDecodeError:
-                logging.error(f'failed to utf-8 decode kprobe line: {line}')
+                logging.debug(f'failed to utf-8 decode kprobe line: {line}')

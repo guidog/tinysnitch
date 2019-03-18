@@ -21,7 +21,6 @@
 # or write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
-import time
 import opensnitch.dns
 import opensnitch.bpftrace
 import opensnitch.kprobe
@@ -52,17 +51,17 @@ def add_meta(packet, conn):
         try:
             pid, start = opensnitch.bpftrace.pids[(src, src_port, dst, dst_port)]
         except KeyError:
-            # logging.info(f'pids missed lookup: {(src, src_port, dst, dst_port)} {proto}')
+            logging.debug(f'pids missed lookup: {(src, src_port, dst, dst_port)} {proto}')
             raise
         try:
             path, args = opensnitch.kprobe.comms[pid]
         except KeyError:
-            # logging.info(f'comms missed lookup: {pid}')
+            logging.debug(f'comms missed lookup: {pid}')
             raise
         try:
             path = opensnitch.kprobe.filenames[pid]
         except KeyError:
-            # logging.info(f'filenames missed lookup: {pid}')
+            logging.debug(f'filenames missed lookup: {pid}')
             raise
     return src, dst, src_port, dst_port, proto, pid, path, args
 
