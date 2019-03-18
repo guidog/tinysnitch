@@ -19,6 +19,6 @@ kprobe:udp_sendmsg
     $lport = $sk->__sk_common.skc_num;
     $dport = $sk->__sk_common.skc_dport;
     $dport = ($dport >> 8) | (($dport << 8) & 0x00FF00); // Destination port is big endian, it must be flipped
-    printf("inet: %d %s %s %d %s %d\n", pid, comm, ntop($af_inet, $daddr), $dport, ntop($af_inet, $saddr), $lport);
+    printf("%d %s %s %d %s %d\n", pid, comm, ntop($af_inet, $daddr), $dport, ntop($af_inet, $saddr), $lport);
   }
 }

@@ -7,6 +7,7 @@
 from __future__ import print_function
 from bcc import BPF
 from collections import defaultdict
+import sys
 
 bpf_text = """
 #include <uapi/linux/ptrace.h>
@@ -22,6 +23,7 @@ enum event_type {
 
 struct data_t {
     u32 pid;  // PID as in the userspace term (i.e. task->tgid in kernel)
+    u32 ppid; // Parent PID as in the userspace term (i.e task->real_parent->tgid in kernel)
     enum event_type type;
     char argv[ARGSIZE];
 };
@@ -54,6 +56,8 @@ int syscall__execve(struct pt_regs *ctx,
     struct data_t data = {};
     struct task_struct *task;
     data.pid = bpf_get_current_pid_tgid() >> 32;
+    task = (struct task_struct *)bpf_get_current_task();
+    data.ppid = task->real_parent->tgid;
     data.type = EVENT_ARG;
     __submit_arg(ctx, (void *)filename, &data);
     // skip first arg, as we submitted filename
@@ -72,7 +76,10 @@ out:
 int do_ret_sys_execve(struct pt_regs *ctx)
 {
     struct data_t data = {};
+    struct task_struct *task;
     data.pid = bpf_get_current_pid_tgid() >> 32;
+    task = (struct task_struct *)bpf_get_current_task();
+    data.ppid = task->real_parent->tgid;
     data.type = EVENT_RET;
     events.perf_submit(ctx, &data, sizeof(data));
     return 0;
@@ -94,7 +101,8 @@ def print_event(cpu, data, size):
         argv[event.pid].append(event.argv)
     elif event.type == EVENT_RET:
         argv_text = b' '.join(argv[event.pid]).replace(b'\n', b'\\n')
-        print(event.pid, argv_text)
+        sys.stdout.write('{} {} {}\n'.format(event.pid, event.ppid, argv_text))
+        sys.stdout.flush()
         argv.pop(event.pid, None)
 
 if __name__ == '__main__':

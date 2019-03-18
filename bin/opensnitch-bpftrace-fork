@@ -2,5 +2,5 @@
 
 tracepoint:sched:sched_process_fork
 {
-    printf("fork: %d %s\n", pid, comm);
+    printf("%d %s\n", ppid, pid, comm);
 }

@@ -2,5 +2,5 @@
 
 tracepoint:sched:sched_process_exec
 {
-    printf("exec: %d %s\n", pid, comm);
+    printf("%d %s\n", pid, comm);
 }
