@@ -82,7 +82,7 @@ def destroy(nfq_q_handle, nfq_handle):
 @ffi.def_extern()
 def py_callback(data, length):
     logging.info('')
-    logging.info(f'sizes: pids={len(opensnitch.bpftrace.pids)} comms={len(opensnitch.kprobe.comms)} filenames={len(opensnitch.kprobe.filenames)}')
+    logging.info(f'sizes: pids={len(opensnitch.trace.pids)} filenames={len(opensnitch.trace.filenames)}')
     unpacked = bytes(ffi.unpack(data, length))
     packet = scapy.layers.inet.IP(unpacked)
     opensnitch.dns.add_response(packet)

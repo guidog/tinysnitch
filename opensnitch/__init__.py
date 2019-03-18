@@ -20,8 +20,7 @@
 import logging
 import opensnitch.dns
 import opensnitch.netfilter
-import opensnitch.bpftrace
-import opensnitch.kprobe
+import opensnitch.trace
 import subprocess
 
 iptables_rules = [
@@ -55,8 +54,7 @@ def main(setup_firewall=False, teardown_firewall=False):
             cc('iptables -D', rule, '|| echo failed to delete:', rule)
     else:
         opensnitch.dns.populate_localhosts()
-        opensnitch.bpftrace.start()
-        opensnitch.kprobe.start()
+        opensnitch.trace.start()
         nfq_handle, nfq_q_handle = opensnitch.netfilter.create(0)
         try:
             nfq_fd = opensnitch.netfilter.setup(nfq_handle, nfq_q_handle)
@@ -65,4 +63,3 @@ def main(setup_firewall=False, teardown_firewall=False):
             pass
         finally:
             opensnitch.netfilter.destroy(nfq_q_handle, nfq_handle)
-            # opensnitch.kprobe.disable()

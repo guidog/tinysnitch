@@ -22,8 +22,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
 import opensnitch.dns
-import opensnitch.bpftrace
-import opensnitch.kprobe
+import opensnitch.trace
 import logging
 
 def ip_proto(pkt):
@@ -42,27 +41,17 @@ def parse(packet):
         dst_port = ip.dport
     return src, dst, src_port, dst_port, proto, pid, path, args
 
+meta_protos = {'tcp', 'udp'}
+
 def add_meta(packet, conn):
+
     # TODO add meta for the server pid on incoming connections. tcp can be seen
     # via opensnitch-bpftrace-tcp-accept, udp can be seen via
     # opensnitch-bpftrace-udp with source and dest address as 0.0.0.0
     src, dst, src_port, dst_port, proto, _pid, _path, _args = conn
-    if proto in {'tcp', 'udp'}:
-        try:
-            pid, start = opensnitch.bpftrace.pids[(src, src_port, dst, dst_port)]
-        except KeyError:
-            logging.debug(f'pids missed lookup: {(src, src_port, dst, dst_port)} {proto}')
-            raise
-        try:
-            path, args = opensnitch.kprobe.comms[pid]
-        except KeyError:
-            logging.debug(f'comms missed lookup: {pid}')
-            raise
-        try:
-            path = opensnitch.kprobe.filenames[pid]
-        except KeyError:
-            logging.debug(f'filenames missed lookup: {pid}')
-            raise
+    if proto in meta_protos:
+        pid, _start = opensnitch.trace.pids[(src, src_port, dst, dst_port)]
+        path, args = opensnitch.trace.filenames[pid]
     return src, dst, src_port, dst_port, proto, pid, path, args
 
 def format(conn):
@@ -70,6 +59,6 @@ def format(conn):
     src = opensnitch.dns.get_hostname(src)
     dst = opensnitch.dns.get_hostname(dst)
     if dst == opensnitch.dns.hostname:
-        return ' '.join(f'{proto} | {dst}:{dst_port} <- {src}:{src_port} | {pid} {path + args}'.split())
+        return ' '.join(f'{proto} | {dst}:{dst_port} <- {src}:{src_port} | {pid} {path} {args}'.split())
     else:
-        return ' '.join(f'{proto} | {src}:{src_port} -> {dst}:{dst_port} | {pid} {path + args}'.split())
+        return ' '.join(f'{proto} | {src}:{src_port} -> {dst}:{dst_port} | {pid} {path} {args}'.split())

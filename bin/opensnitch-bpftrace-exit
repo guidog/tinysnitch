@@ -2,5 +2,5 @@
 
 tracepoint:sched:sched_process_exit
 {
-    printf("%d %s\n", pid, comm);
+    printf("%d %s\n", args->pid, comm);
 }
