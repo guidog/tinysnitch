@@ -24,15 +24,11 @@ import opensnitch.trace
 import subprocess
 
 iptables_rules = [
-
     "INPUT --protocol udp --sport 53 -j NFQUEUE --queue-num 0",
-
     "OUTPUT -m conntrack --ctstate NEW -j NFQUEUE --queue-num 0",
     "INPUT -m conntrack --ctstate NEW -j NFQUEUE --queue-num 0",
-
     "INPUT -m mark --mark 101285 -j REJECT",
     "OUTPUT -m mark --mark 101285 -j REJECT",
-
 ]
 
 cc = lambda *a: subprocess.check_call(' '.join(map(str, a)), shell=True, executable='/bin/bash')

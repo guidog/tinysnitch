@@ -104,7 +104,6 @@ def _tail_tcp_udp(proc):
                 start = time.monotonic()
                 pids[(daddr, dport, saddr, sport)] = pid, start
                 pids[(saddr, sport, daddr, dport)] = pid, start
-                logging.info(f'tcp/udp traced {pid} {(saddr, sport, daddr, dport)}')
     logging.error('tail exited prematurely')
     sys.exit(1)
 

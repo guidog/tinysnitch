@@ -81,8 +81,6 @@ def destroy(nfq_q_handle, nfq_handle):
 
 @ffi.def_extern()
 def py_callback(data, length):
-    logging.info('')
-    logging.info(f'sizes: pids={len(opensnitch.trace.pids)} filenames={len(opensnitch.trace.filenames)}')
     unpacked = bytes(ffi.unpack(data, length))
     packet = scapy.layers.inet.IP(unpacked)
     opensnitch.dns.add_response(packet)
@@ -91,10 +89,10 @@ def py_callback(data, length):
     try:
         conn = opensnitch.connection.add_meta(packet, conn)
     except KeyError:
+        src, dst, src_port, dst_port, proto, pid, path, args = conn
         checksum = hashlib.md5(unpacked).hexdigest()
         repeats[checksum] += 1
         if repeats[checksum] > 2:
-            logging.info(f'failed to add meta to {checksum} after 3 requeues')
             action = ALLOW
         else:
             action = REPEAT
@@ -109,7 +107,8 @@ def py_callback(data, length):
         else:
             action = DENY
     if action == ALLOW:
-        logging.info(f'allow: {opensnitch.connection.format(conn)}')
+        if not (dst in opensnitch.dns.localhosts and src_port == 53): # dont double print dns packets, the only ones we track after --ctstate NEW
+            logging.info(f'allow: {opensnitch.connection.format(conn)}')
     elif action == DENY:
         logging.info(f'deny: {opensnitch.connection.format(conn)}')
     return action

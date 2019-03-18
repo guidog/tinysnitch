@@ -23,7 +23,6 @@
 
 import opensnitch.dns
 import opensnitch.trace
-import logging
 
 def ip_proto(pkt):
     proto_field = pkt.get_field('proto')

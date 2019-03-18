@@ -31,6 +31,7 @@ co = lambda *a: subprocess.check_output(' '.join(map(str, a)), shell=True, execu
 with open('/etc/hostname') as f:
     hostname = f.read().strip()
 hosts = {}
+localhosts = set()
 
 def _decode(x):
     try:
@@ -43,6 +44,7 @@ def populate_localhosts():
         _, addr, *_ = line.strip().split()
         addr = addr.split('/')[0]
         hosts[addr] = hostname
+        localhosts.add(addr)
         logging.info(f'dns: {hostname} {addr}')
 
 def parse_dns(packet):
