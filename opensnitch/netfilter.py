@@ -42,32 +42,31 @@ import hashlib
 
 repeats = collections.defaultdict(int)
 
-DENY = ffi.cast('int', 0)
-ALLOW = ffi.cast('int', 1)
-REPEAT = ffi.cast('int', 2)
-AF_INET = ffi.cast('int', 2)
-AF_INET6 = ffi.cast('int', 10)
-NF_MARK_SET = ffi.cast('unsigned int', 1)
-NF_DEFAULT_QUEUE_SIZE = ffi.cast('unsigned int', 4096)
-NF_DEFAULT_PACKET_SIZE = ffi.cast('unsigned int', 4096)
-DEFAULT_TOTAL_SIZE = ffi.cast('unsigned int', 4096 * 4096)
+_DENY = ffi.cast('int', 0)
+_ALLOW = ffi.cast('int', 1)
+_REPEAT = ffi.cast('int', 2)
+_AF_INET = ffi.cast('int', 2)
+_AF_INET6 = ffi.cast('int', 10)
+_NF_DEFAULT_QUEUE_SIZE = ffi.cast('unsigned int', 4096)
+_NF_DEFAULT_PACKET_SIZE = ffi.cast('unsigned int', 4096)
+_DEFAULT_TOTAL_SIZE = ffi.cast('unsigned int', 4096 * 4096)
 
 def create(queue_num):
     queue_num = ffi.cast('unsigned int', queue_num)
     queue_id = ffi.cast('unsigned int', time.time())
     nfq_handle = lib.nfq_open()
-    assert lib.nfq_unbind_pf(nfq_handle, AF_INET) >= 0
-    assert lib.nfq_unbind_pf(nfq_handle, AF_INET6) >= 0
-    assert lib.nfq_bind_pf(nfq_handle, AF_INET) >= 0
-    assert lib.nfq_bind_pf(nfq_handle, AF_INET6) >= 0
+    assert lib.nfq_unbind_pf(nfq_handle, _AF_INET) >= 0
+    assert lib.nfq_unbind_pf(nfq_handle, _AF_INET6) >= 0
+    assert lib.nfq_bind_pf(nfq_handle, _AF_INET) >= 0
+    assert lib.nfq_bind_pf(nfq_handle, _AF_INET6) >= 0
     nfq_q_handle = lib.create_queue(nfq_handle, queue_num, queue_id)
     return nfq_handle, nfq_q_handle
 
 def setup(nfq_handle, nfq_q_handle):
-    assert lib.nfq_set_queue_maxlen(nfq_q_handle, NF_DEFAULT_QUEUE_SIZE) >= 0
-    assert lib.nfq_set_mode(nfq_q_handle, ffi.cast('unsigned int', 2), NF_DEFAULT_PACKET_SIZE) >= 0
+    assert lib.nfq_set_queue_maxlen(nfq_q_handle, _NF_DEFAULT_QUEUE_SIZE) >= 0
+    assert lib.nfq_set_mode(nfq_q_handle, ffi.cast('unsigned int', 2), _NF_DEFAULT_PACKET_SIZE) >= 0
     nfq_fd = lib.nfq_fd(nfq_handle)
-    assert lib.nfnl_rcvbufsiz(lib.nfq_nfnlh(nfq_handle), DEFAULT_TOTAL_SIZE) >= 0
+    assert lib.nfnl_rcvbufsiz(lib.nfq_nfnlh(nfq_handle), _DEFAULT_TOTAL_SIZE) >= 0
     return nfq_fd
 
 def run(nfq_handle, nfq_fd):
@@ -80,12 +79,12 @@ def destroy(nfq_q_handle, nfq_handle):
         assert lib.nfq_close(nfq_handle) == 0
 
 @ffi.def_extern()
-def py_callback(data, length):
+def _py_callback(data, length):
     unpacked = bytes(ffi.unpack(data, length))
     packet = scapy.layers.inet.IP(unpacked)
     opensnitch.dns.update_hosts(packet)
     conn = opensnitch.conn.parse(packet)
-    action = ALLOW
+    action = _ALLOW
     try:
         conn = opensnitch.conn.add_meta(conn)
     except KeyError:
@@ -93,22 +92,22 @@ def py_callback(data, length):
         checksum = hashlib.md5(unpacked).hexdigest()
         repeats[checksum] += 1
         if repeats[checksum] > 2:
-            action = ALLOW
+            action = _ALLOW
         else:
-            action = REPEAT
+            action = _REPEAT
     else:
         src, dst, src_port, dst_port, proto, pid, path, args = conn
         if False:
             pass
         elif (src == dst == '127.0.0.1' or proto == 'hopopt'):
-            action = ALLOW
+            action = _ALLOW
         elif True:
-            action = ALLOW
+            action = _ALLOW
         else:
-            action = DENY
-    if action == ALLOW:
+            action = _DENY
+    if action == _ALLOW:
         if not (dst in opensnitch.dns.localhosts and src_port == 53): # dont double print dns packets, the only ones we track after --ctstate NEW
             logging.info(f'allow: {opensnitch.conn.format(conn)}')
-    elif action == DENY:
+    elif action == _DENY:
         logging.info(f'deny: {opensnitch.conn.format(conn)}')
     return action

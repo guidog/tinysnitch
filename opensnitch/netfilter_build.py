@@ -28,7 +28,7 @@ ffibuilder = FFI()
 
 ffibuilder.cdef(r"""
 
-extern "Python" int py_callback(unsigned char* data, unsigned int len);
+extern "Python" int _py_callback(unsigned char* data, unsigned int len);
 static inline struct nfq_q_handle* create_queue(struct nfq_handle *h, unsigned int queue, unsigned int idx);
 static inline int run(struct nfq_handle *h, int fd);
 struct nfq_handle * nfq_open (void);
@@ -56,14 +56,14 @@ ffibuilder.set_source(
 #define NF_ACCEPT 1
 #define NF_REPEAT 4
 
-static int py_callback(unsigned char* data, unsigned int len);
+static int _py_callback(unsigned char* data, unsigned int len);
 
 static int nf_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *arg) {
     unsigned char *buffer = NULL;
     struct nfqnl_msg_packet_hdr *ph = nfq_get_msg_packet_hdr(nfa);
     unsigned int id = ntohl(ph->packet_id);
     unsigned int size = nfq_get_payload(nfa, &buffer);
-    int response = py_callback(buffer, size);
+    int response = _py_callback(buffer, size);
     if (response == 0)
         return nfq_set_verdict2(qh, id, NF_ACCEPT, NF_MARK, size, buffer);
     else if (response == 1)
