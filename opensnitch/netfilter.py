@@ -35,7 +35,7 @@ except ModuleNotFoundError:
 import scapy.layers.inet
 import logging
 import time
-import opensnitch.connection
+import opensnitch.conn
 import opensnitch.dns
 import collections
 import hashlib
@@ -84,10 +84,10 @@ def py_callback(data, length):
     unpacked = bytes(ffi.unpack(data, length))
     packet = scapy.layers.inet.IP(unpacked)
     opensnitch.dns.add_response(packet)
-    conn = opensnitch.connection.parse(packet)
+    conn = opensnitch.conn.parse(packet)
     action = ALLOW
     try:
-        conn = opensnitch.connection.add_meta(packet, conn)
+        conn = opensnitch.conn.add_meta(packet, conn)
     except KeyError:
         src, dst, src_port, dst_port, proto, pid, path, args = conn
         checksum = hashlib.md5(unpacked).hexdigest()
@@ -108,7 +108,7 @@ def py_callback(data, length):
             action = DENY
     if action == ALLOW:
         if not (dst in opensnitch.dns.localhosts and src_port == 53): # dont double print dns packets, the only ones we track after --ctstate NEW
-            logging.info(f'allow: {opensnitch.connection.format(conn)}')
+            logging.info(f'allow: {opensnitch.conn.format(conn)}')
     elif action == DENY:
-        logging.info(f'deny: {opensnitch.connection.format(conn)}')
+        logging.info(f'deny: {opensnitch.conn.format(conn)}')
     return action
