@@ -25,6 +25,9 @@ import sys
 import functools
 import os
 import signal
+import subprocess
+
+co = lambda *a: subprocess.check_output(' '.join(map(str, a)), shell=True, executable='/bin/bash').decode('utf-8').strip()
 
 seconds = 15
 pids = {}
@@ -156,10 +159,28 @@ pairs = [
     ('opensnitch-bcc-execve', _tail_execve),
 ]
 
+def _load_existing_pids():
+    xs = co('ps -ef | sed 1d').splitlines()
+    xs = (x.split(None, 7) for x in xs)
+    xs = ((pid, path) for uid, pid, ppid, c, stime, tty, time, path in xs)
+    xs = ((pid, path) for pid, path in xs if not path.startswith('['))
+    for pid, path in xs:
+        try:
+            path, args = path.split(None, 1)
+        except ValueError:
+            args = ''
+        if '/' not in path:
+            try:
+                path = co(f'sudo ls -l /proc/{pid}/exe 2>/dev/null').split(' -> ')[-1]
+            except subprocess.CalledProcessError:
+                pass
+        filenames[pid] = path, args
+
 def start():
+    _load_existing_pids()
     run_thread(_gc)
     for program, tail in pairs:
-        proc = subprocess.Popen(['stdbuf', '-o0', program], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        proc = subprocess.Popen(['stdbuf', '-oL', program], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         run_thread(_monitor, proc)
         run_thread(tail, proc)
         logging.info(f'started trace: {program}')
