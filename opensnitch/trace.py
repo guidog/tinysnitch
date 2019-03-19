@@ -65,7 +65,7 @@ def _gc():
             if now - start > seconds:
                 del pids[k]
         time.sleep(1)
-    logging.error('gc exited prematurely')
+    logging.error('trace gc exited prematurely')
     sys.exit(1)
 
 def _tail_execve(proc):

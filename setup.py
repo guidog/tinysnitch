@@ -5,4 +5,5 @@ setuptools.setup(
     name="opensnitch",
     packages=['opensnitch'],
     license='GPL',
+    install_requires=['xxhash']
 )

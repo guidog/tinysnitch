@@ -32,15 +32,19 @@ except ModuleNotFoundError:
     os.chdir(orig)
     from opensnitch._netfilter import ffi, lib
 
+import sys
+import time
 import scapy.layers.inet
 import logging
 import time
 import opensnitch.conn
 import opensnitch.dns
+import opensnitch.trace
 import collections
-import hashlib
+import xxhash
 
-repeats = collections.defaultdict(int)
+_repeats = collections.defaultdict(int)
+_repeats_start = {}
 
 _DENY = ffi.cast('int', 0)
 _ALLOW = ffi.cast('int', 1)
@@ -70,6 +74,7 @@ def setup(nfq_handle, nfq_q_handle):
     return nfq_fd
 
 def run(nfq_handle, nfq_fd):
+    opensnitch.trace.run_thread(_gc)
     assert lib.run(nfq_handle, nfq_fd) == 0
 
 def destroy(nfq_q_handle, nfq_handle):
@@ -77,6 +82,17 @@ def destroy(nfq_q_handle, nfq_handle):
         assert lib.nfq_destroy_queue(nfq_q_handle) == 0
     if nfq_handle:
         assert lib.nfq_close(nfq_handle) == 0
+
+def _gc():
+    while True:
+        now = time.monotonic()
+        for checksum, start in list(_repeats_start.items()):
+            if now - start > opensnitch.trace.seconds:
+                del _repeats[checksum]
+                del _repeats_start[checksum]
+        time.sleep(1)
+    logging.error('trace gc exited prematurely')
+    sys.exit(1)
 
 @ffi.def_extern()
 def _py_callback(data, length):
@@ -89,9 +105,10 @@ def _py_callback(data, length):
         conn = opensnitch.conn.add_meta(conn)
     except KeyError:
         src, dst, src_port, dst_port, proto, pid, path, args = conn
-        checksum = hashlib.md5(unpacked).hexdigest()
-        repeats[checksum] += 1
-        if repeats[checksum] > 2:
+        checksum = xxhash.xxh64_hexdigest(unpacked)
+        _repeats_start[checksum] = time.monotonic()
+        _repeats[checksum] += 1
+        if _repeats[checksum] > 4:
             action = _ALLOW
         else:
             action = _REPEAT
