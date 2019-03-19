@@ -22,11 +22,9 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
 import logging
-import subprocess
+import opensnitch.shell
 from scapy.layers.dns import DNS
 from scapy.layers.inet import UDP
-
-co = lambda *a: subprocess.check_output(' '.join(map(str, a)), shell=True, executable='/bin/bash').decode('utf-8').strip()
 
 with open('/etc/hostname') as f:
     hostname = f.read().strip()
@@ -37,17 +35,17 @@ def _decode(x):
     try:
         return x.decode('utf-8').rstrip('.')
     except:
-        return x
+        return x.rstrip()
 
 def populate_localhosts():
-    for line in co('ip a | grep inet').splitlines():
+    for line in opensnitch.shell.co('ip a | grep inet').splitlines():
         _, addr, *_ = line.strip().split()
         addr = addr.split('/')[0]
         hosts[addr] = hostname
         localhosts.add(addr)
         logging.info(f'dns: {hostname} {addr}')
 
-def parse_dns(packet):
+def _parse_dns(packet):
     udp = packet['UDP']
     dns = packet['DNS']
     if int(udp.dport) == 53:
@@ -57,10 +55,10 @@ def parse_dns(packet):
             dnsrr = dns.an[i]
             yield _decode(dnsrr.rrname), _decode(dnsrr.rdata)
 
-def add_response(packet):
+def update_hosts(packet):
     if UDP in packet and DNS in packet:
         addrs = []
-        for name, addr in parse_dns(packet):
+        for name, addr in _parse_dns(packet):
             if addr:
                 hosts[addr] = name
                 addrs.append(addr)

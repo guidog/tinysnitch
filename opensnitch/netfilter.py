@@ -83,11 +83,11 @@ def destroy(nfq_q_handle, nfq_handle):
 def py_callback(data, length):
     unpacked = bytes(ffi.unpack(data, length))
     packet = scapy.layers.inet.IP(unpacked)
-    opensnitch.dns.add_response(packet)
+    opensnitch.dns.update_hosts(packet)
     conn = opensnitch.conn.parse(packet)
     action = ALLOW
     try:
-        conn = opensnitch.conn.add_meta(packet, conn)
+        conn = opensnitch.conn.add_meta(conn)
     except KeyError:
         src, dst, src_port, dst_port, proto, pid, path, args = conn
         checksum = hashlib.md5(unpacked).hexdigest()

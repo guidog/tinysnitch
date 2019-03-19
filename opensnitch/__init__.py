@@ -21,29 +21,26 @@ import logging
 import opensnitch.dns
 import opensnitch.netfilter
 import opensnitch.trace
-import subprocess
+import opensnitch.shell
 
-iptables_rules = [
-    "INPUT --protocol udp --sport 53 -j NFQUEUE --queue-num 0",
-    "OUTPUT -m conntrack --ctstate NEW -j NFQUEUE --queue-num 0",
-    "INPUT -m conntrack --ctstate NEW -j NFQUEUE --queue-num 0",
-    "INPUT -m mark --mark 101285 -j REJECT",
-    "OUTPUT -m mark --mark 101285 -j REJECT",
+_iptables_rules = [
+    "INPUT --protocol udp --sport 53 -j NFQUEUE --queue-num 0",   # catch dns packets on the way back in so we can read the resolved address
+    "OUTPUT -m conntrack --ctstate NEW -j NFQUEUE --queue-num 0", # potentially block incoming traffic
+    "INPUT -m conntrack --ctstate NEW -j NFQUEUE --queue-num 0",  # potentially block outgoing traffic
+    "INPUT -m mark --mark 101285 -j REJECT",                      # inbound rejection mark
+    "OUTPUT -m mark --mark 101285 -j REJECT",                     # outbound rejection mark
 ]
 
-cc = lambda *a: subprocess.check_call(' '.join(map(str, a)), shell=True, executable='/bin/bash')
-co = lambda *a: subprocess.check_output(' '.join(map(str, a)), shell=True, executable='/bin/bash').decode('utf-8').strip()
-
-assert co('whoami') == 'root', 'opensnitchd must run as root'
+assert opensnitch.shell.co('whoami') == 'root', 'opensnitchd must run as root'
 
 def main(setup_firewall=False, teardown_firewall=False):
     logging.basicConfig(level='INFO', format='%(message)s')
     if setup_firewall:
-        for rule in iptables_rules:
-            cc('iptables -I', rule)
+        for rule in _iptables_rules:
+            opensnitch.shell.cc('iptables -I', rule)
     elif teardown_firewall:
-        for rule in iptables_rules:
-            cc('iptables -D', rule, '|| echo failed to delete:', rule)
+        for rule in _iptables_rules:
+            opensnitch.shell.cc('iptables -D', rule, '|| echo failed to delete:', rule)
     else:
         opensnitch.dns.populate_localhosts()
         opensnitch.trace.start()
