@@ -59,10 +59,13 @@ def parse_dns(packet):
 
 def add_response(packet):
     if UDP in packet and DNS in packet:
+        addrs = []
         for name, addr in parse_dns(packet):
             if addr:
-                logging.info(f'dns: {name} {addr}')
                 hosts[addr] = name
+                addrs.append(addr)
+        if addrs:
+            logging.info(f'dns: {name} {" ".join(addrs)}')
 
 def get_hostname(address):
     return hosts.get(address, address)
