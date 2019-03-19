@@ -159,7 +159,7 @@ pairs = [
 def start():
     run_thread(_gc)
     for program, tail in pairs:
-        proc = subprocess.Popen(['sudo', 'stdbuf', '-o0', program], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        proc = subprocess.Popen(['stdbuf', '-o0', program], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         run_thread(_monitor, proc)
         run_thread(tail, proc)
         logging.info(f'started trace: {program}')

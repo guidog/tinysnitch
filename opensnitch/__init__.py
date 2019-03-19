@@ -37,11 +37,7 @@ co = lambda *a: subprocess.check_output(' '.join(map(str, a)), shell=True, execu
 assert co('whoami') == 'root', 'opensnitchd must run as root'
 
 def main(setup_firewall=False, teardown_firewall=False):
-    logging.basicConfig(
-        level='INFO',
-        # level='ERROR',
-        format='%(message)s',
-    )
+    logging.basicConfig(level='INFO', format='%(message)s')
     if setup_firewall:
         for rule in iptables_rules:
             cc('iptables -I', rule)

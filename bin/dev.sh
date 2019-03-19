@@ -8,7 +8,7 @@ find -type f \
 
 find -type f \
     | grep -E "\.c$|\.o$|\.so$" \
-    | xargs sudo rm -fv
-sudo ./bin/opensnitchd
+    | xargs rm -fv
+./bin/opensnitchd
 
 '
