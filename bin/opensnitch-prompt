@@ -5,12 +5,12 @@ from PyQt5 import QtWidgets
 from PyQt5 import QtCore
 import argh
 
+durations = 'once', '1-minute', '3-minutes', '9-minutes', 'until-quit', 'forever'
+scope = 'port-domain', 'domain'
+action = 'yes', 'no'
+
 class MainWindow(QtWidgets.QMainWindow):
-    def __init__(self, words):
-        self.duration = 'once'
-        self.scope = 'domain'
-        self.action = 'allow'
-        self.text = ' '.join(words)
+    def qt_setup(self):
         QtWidgets.QMainWindow.__init__(self)
         centralWidget = QtWidgets.QWidget(self)
         self.setCentralWidget(centralWidget)
@@ -19,37 +19,63 @@ class MainWindow(QtWidgets.QMainWindow):
         palette = self.palette()
         palette.setColor(self.backgroundRole(), QColor(20, 20, 20))
         self.setPalette(palette)
-        self.setStyleSheet("QLabel {font: 20pt Mono; color: rgb(200,200,200);}")
+        self.setStyleSheet("QLabel { font: 20pt Mono; color: rgb(200,200,200); }")
         self.title = QtWidgets.QLabel('', self)
         self.title.setAlignment(QtCore.Qt.AlignCenter)
         gridLayout.addWidget(self.title, 0, 0)
+
+    def __init__(self, words):
+        self.qt_setup()
+        self.duration = 'once'
+        self.scope = 'port-domain'
+        self.action = 'no'
+        self.help = False
+        self.text = ' '.join(words)
         self.update()
 
     def keyPressEvent(self, event, **kw):
         key = event.key()
-        if key in [16777220, 16777216, 81]: # enter, esc, q
-            sys.exit(0)
-        elif key == 89: # y
-            self.action = 'approve'
-        elif key == 78: # n
-            self.action = 'deny'
-        elif key == 85: # u
-            self.duration = 'until-quit'
-        elif key == 72: # h
-            self.scope = 'host'
-        elif key == 67: # c
-            pass
+        if self.help:
+            self.help = False
+            self.update()
         else:
-            print(key)
+            if key == 89: # y
+                self.action = 'yes'
+                self.exit()
+            elif key == 78: # n
+                self.action = 'no'
+                self.exit()
+            elif key == 68: # d
+                self.scope = 'domain'
+            elif key == 80: # p
+                self.scope = 'port-domain'
+            elif key == 79: # o
+                self.duration = 'once'
+            elif key == 49: # 1
+                self.duration = '1-minute'
+            elif key == 51: # 3
+                self.duration = '3-minutes'
+            elif key == 57: # 9
+                self.duration = '9-minutes'
+            elif key == 85: # u
+                self.duration = 'until-quit'
+            elif key == 70: # f
+                self.duration = 'forever'
+            elif key == 72: # h
+                self.help = True
+                return self.title.setText('<p style="line-height: 50px;"><span style="font-weight: bold;">actions</span><br/>(y)es<br/>(n)o<br/><br/><span style="font-weight: bold;">domains</span><br/>(d)omain<br/>(p)ort-domain<br/><br/><span style="font-weight: bold;">duration</span><br/>(o)nce<br/>(1)minute<br/>(3)minutes<br/>(9)minutes<br/>(u)ntil-quit<br/>(f)orever</p>') # noqa
         self.update()
 
     def update(self):
-        self.title.setText(f'{self.text}\n\n{self.duration} {self.scope} {self.action}')
+        self.title.setText(f'{self.text}\n\n{self.duration} {self.scope}\n\n(y)es (n)o (h)elp')
+
+    def exit(self):
+        self.update()
+        print(f'{self.duration} {self.scope} {self.action}')
+        sys.exit(0)
 
 @argh.dispatch_command
 def main(*words):
     app = QtWidgets.QApplication(sys.argv)
     win = MainWindow(words)
     win.show()
-    print(f'{win.duration} {win.scope} {win.action}')
-    sys.exit(app.exec_())
