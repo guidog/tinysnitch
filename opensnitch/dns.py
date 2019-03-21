@@ -26,8 +26,7 @@ import opensnitch.shell
 from scapy.layers.dns import DNS
 from scapy.layers.inet import UDP
 
-with open('/etc/hostname') as f:
-    hostname = f.read().strip()
+hostname = 'localhost'
 hosts = {}
 localhosts = set()
 

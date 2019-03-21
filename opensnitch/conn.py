@@ -36,14 +36,14 @@ def parse(packet):
         dst_port = ip.dport
     return src, dst, src_port, dst_port, proto, pid, path, args
 
-_meta_protos = {'tcp', 'udp'}
+protos = {'tcp', 'udp'}
 
 def add_meta(conn):
     # TODO add meta for the server pid on incoming connections. tcp can be seen
     # via opensnitch-bpftrace-tcp-accept, udp can be seen via
     # opensnitch-bpftrace-udp with source and dest address as 0.0.0.0
     src, dst, src_port, dst_port, proto, _pid, _path, _args = conn
-    if proto in _meta_protos:
+    if proto in protos:
         pid, _start = opensnitch.trace.pids[(src, src_port, dst, dst_port)]
         path, args = opensnitch.trace.filenames[pid]
     return src, dst, src_port, dst_port, proto, pid, path, args

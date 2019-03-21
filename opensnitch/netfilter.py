@@ -32,23 +32,21 @@ except ModuleNotFoundError:
     os.chdir(orig)
     from opensnitch._netfilter import ffi, lib
 
-import sys
-import time
-import scapy.layers.inet
+import collections
 import logging
-import time
 import opensnitch.conn
 import opensnitch.dns
+import opensnitch.rules
 import opensnitch.trace
-import collections
+import scapy.layers.inet
+import sys
+import time
+import time
 import xxhash
 
 _repeats = collections.defaultdict(int)
 _repeats_start = {}
 
-_DENY = ffi.cast('int', 0)
-_ALLOW = ffi.cast('int', 1)
-_REPEAT = ffi.cast('int', 2)
 _AF_INET = ffi.cast('int', 2)
 _AF_INET6 = ffi.cast('int', 10)
 _NF_DEFAULT_QUEUE_SIZE = ffi.cast('unsigned int', 4096)
@@ -100,31 +98,22 @@ def _py_callback(data, length):
     packet = scapy.layers.inet.IP(unpacked)
     opensnitch.dns.update_hosts(packet)
     conn = opensnitch.conn.parse(packet)
-    action = _ALLOW
     try:
         conn = opensnitch.conn.add_meta(conn)
     except KeyError:
-        src, dst, src_port, dst_port, proto, pid, path, args = conn
         checksum = xxhash.xxh64_hexdigest(unpacked)
         _repeats_start[checksum] = time.monotonic()
         _repeats[checksum] += 1
         if _repeats[checksum] > 4:
-            action = _ALLOW
+            action = opensnitch.rules.check(conn)
         else:
-            action = _REPEAT
+            action = opensnitch.rules.REPEAT
     else:
+        action = opensnitch.rules.check(conn)
+    if action is opensnitch.rules.ALLOW:
         src, dst, src_port, dst_port, proto, pid, path, args = conn
-        if False:
-            pass
-        elif (src == dst == '127.0.0.1' or proto == 'hopopt'):
-            action = _ALLOW
-        elif True:
-            action = _ALLOW
-        else:
-            action = _DENY
-    if action == _ALLOW:
-        if not (dst in opensnitch.dns.localhosts and src_port == 53): # dont double print dns packets, the only ones we track after --ctstate NEW
+        if not (dst in opensnitch.dns.localhosts and src_port == 53): # dont double print dns packets, the only ones we track after --ctstate NEW, so that we can log the solved addr
             logging.info(f'allow: {opensnitch.conn.format(conn)}')
-    elif action == _DENY:
+    elif action is opensnitch.rules.DENY:
         logging.info(f'deny: {opensnitch.conn.format(conn)}')
     return action

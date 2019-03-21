@@ -6,8 +6,8 @@ from PyQt5 import QtCore
 import argh
 
 durations = 'once', '1-minute', '3-minutes', '9-minutes', 'until-quit', 'forever'
-scope = 'port-domain', 'domain'
-action = 'yes', 'no'
+scopes = 'port-domain', 'domain'
+actions = 'yes', 'no'
 
 class MainWindow(QtWidgets.QMainWindow):
     def qt_setup(self):
@@ -79,3 +79,4 @@ def main(*words):
     app = QtWidgets.QApplication(sys.argv)
     win = MainWindow(words)
     win.show()
+    app.exec_()
