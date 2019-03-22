@@ -80,7 +80,7 @@ def _tail_execve(proc):
             try:
                 pid, path, *args = line.split()
             except ValueError:
-                logging.error(f'bad execve line: {[line]}')
+                logging.debug(f'bad execve line: {[line]}')
             else:
                 filenames[pid] = path, ' '.join(args)
     logging.error('tail execve prematurely')
