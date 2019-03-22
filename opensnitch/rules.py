@@ -79,7 +79,7 @@ def load_permanent_rules():
         if rule:
             action, dst, dst_port, proto, path, args = rule
             _rules[(dst, dst_port, proto, path, args)] = action, None, None
-    for (dst, dst_port, proto, path, args), (action, _, _) in sorted(_rules.items()):
+    for (dst, dst_port, proto, path, args), (action, _, _) in sorted(_rules.items(), key=str):
         logging.info(f'loaded rule: {action} {dst} {dst_port} {proto} {path} {args}')
     if list(lines):
         logging.info(f'loaded {i + 1} rules from: {_rules_file}')
@@ -118,6 +118,7 @@ def check(conn, prompt=True):
             if duration == 'once':
                 return ALLOW if action == 'yes' else DENY
             else:
+                _duration = duration
                 if duration == 'until-quit':
                     duration = pid
                 elif '-minute' in duration:
@@ -134,7 +135,7 @@ def check(conn, prompt=True):
                     persist_rule(k, v)
                     logging.info(f'add permanent rule: {action} {dst} {dst_port} {proto} {path} {args}')
                 else:
-                    logging.info(f'add temporary rule: {action} {duration} {dst} {dst_port} {proto} {path} {args}')
+                    logging.info(f'add temporary rule: {action} {_duration} {dst} {dst_port} {proto} {path} {args}')
                 return check(conn)
     else:
         action, duration, start = rule

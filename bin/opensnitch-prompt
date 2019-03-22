@@ -32,7 +32,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.scope = 'port-domain'
         self.action = 'no'
         self.help = False
-        self.text = ' '.join(words)
+        self.text = ' '.join(words).replace('|', '\n\n')
         self.update()
 
     def keyPressEvent(self, event, **kw):
@@ -73,7 +73,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.update()
 
     def update(self):
-        self.title.setText(f'{self.text}\n\n{self.duration} {self.scope} {self.granularity}\n\n(y)es (n)o (h)elp')
+        self.title.setText(f'{self.text}\n\n{"-" * 250}\n\n{self.duration} {self.scope} {self.granularity}\n\n(y)es (n)o (h)elp')
 
     def exit(self):
         self.update()

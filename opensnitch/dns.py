@@ -21,14 +21,18 @@
 # or write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
+import time
 import logging
 import opensnitch.shell
+import opensnitch.trace
 from scapy.layers.dns import DNS
 from scapy.layers.inet import UDP
 
 hostname = 'localhost'
 hosts = {}
 localhosts = set()
+_hosts_file = '/etc/opensnitch.hosts'
+_new_addrs = []
 
 def _decode(x):
     try:
@@ -36,13 +40,30 @@ def _decode(x):
     except:
         return x.rstrip()
 
-def populate_localhosts():
+def start():
+    _populate_localhosts()
+    _populate_hosts()
+    opensnitch.trace.run_thread(_persister)
+
+def _populate_hosts():
+    try:
+        with open(_hosts_file) as f:
+            lines = f.read().splitlines()
+    except FileNotFoundError:
+        with open(_hosts_file, 'w') as _:
+            lines = []
+    for line in lines:
+        addr, hostname = line.split()
+        hosts[addr] = hostname
+        logging.debug(f'load dns: {hostname} {addr}')
+
+def _populate_localhosts():
     for line in opensnitch.shell.co('ip a | grep inet').splitlines():
         _, addr, *_ = line.strip().split()
         addr = addr.split('/')[0]
         hosts[addr] = hostname
         localhosts.add(addr)
-        logging.info(f'dns: {hostname} {addr}')
+        logging.info(f'localhost dns: {hostname} {addr}')
 
 def _parse_dns(packet):
     udp = packet['UDP']
@@ -61,8 +82,21 @@ def update_hosts(packet):
             if addr:
                 hosts[addr] = name
                 addrs.append(addr)
+                _new_addrs.append(addr)
         if addrs:
             logging.info(f'dns: {name} {" ".join(addrs)}')
 
 def get_hostname(address):
     return hosts.get(address, address)
+
+def _persister():
+    while True:
+        while True:
+            with open(_hosts_file, 'a') as f:
+                try:
+                    addr = _new_addrs.pop()
+                except IndexError:
+                    break
+                else:
+                    f.write(f'{addr} {hosts[addr]}\n')
+        time.sleep(1)

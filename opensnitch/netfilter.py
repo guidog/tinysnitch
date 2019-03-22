@@ -109,7 +109,7 @@ def _py_callback(data, length):
         checksum = xxhash.xxh64_hexdigest(unpacked) # TODO update to xx3hash
         _repeats_start[checksum] = time.monotonic()
         _repeats[checksum] += 1
-        if _repeats[checksum] > 10:
+        if _repeats[checksum] > 100: # this has to be high to give trace.py a chance to catch up, otherwise you are missing pid/path/args data often
             action = opensnitch.rules.check(conn)
         else:
             action = opensnitch.rules.REPEAT

@@ -42,7 +42,7 @@ def main(setup_firewall=False, teardown_firewall=False):
         for rule in _iptables_rules:
             opensnitch.shell.cc('iptables -D', rule, '|| echo failed to delete:', rule)
     else:
-        opensnitch.dns.populate_localhosts()
+        opensnitch.dns.start()
         opensnitch.trace.start()
         opensnitch.rules.load_permanent_rules()
         nfq_handle, nfq_q_handle = opensnitch.netfilter.create(0)
