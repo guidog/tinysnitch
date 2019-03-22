@@ -7,8 +7,13 @@ import argh
 
 durations = 'once', '1-minute', '3-minutes', '9-minutes', 'until-quit', 'forever'
 scopes = 'port-domain', 'domain'
-granularity = 'just-path', 'args-and-path'
+granularities = 'just-path', 'args-and-path'
 actions = 'yes', 'no'
+
+# TODO add a repeat button for when 10 repeats isnt enough
+# TODO add brackets around the selection for scope and granularity, ie [google.com]:443 and [google.com:443]
+# TODO move cc/co into lib.py and refactor other stuff into there, no more deps on trace.py
+# TODO add a (l)egend to main menu, shows names of the data in diff sections
 
 class MainWindow(QtWidgets.QMainWindow):
     def qt_setup(self):
@@ -65,7 +70,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.duration = 'forever'
             elif key == 72: # h
                 self.help = True
-                return self.title.setText('<p style="line-height: 50px;"><span style="font-weight: bold;">actions</span><br/>(y)es<br/>(n)o<br/><br/><span style="font-weight: bold;">scope</span><br/>(d)omain<br/>(p)ort-domain<br/><br/><span style="font-weight: bold;">granularity</span><br/>(a)args-and-path<br/>(j)ust-path<br/><br/><span style="font-weight: bold;">duration</span><br/>(o)nce<br/>(1)minute<br/>(3)minutes<br/>(9)minutes<br/>(u)ntil-quit<br/>(f)orever</p>') # noqa
+                return self.title.setText('<p style="line-height: 50px;"><span style="font-weight: bold;">actions</span><br/>(y)es<br/>(n)o<br/><br/><span style="font-weight: bold;">scope</span><br/>(d)omain<br/>(p)ort-domain<br/><br/><span style="font-weight: bold;">granularity</span><br/>(a)rgs-and-path<br/>(j)ust-path<br/><br/><span style="font-weight: bold;">duration</span><br/>(o)nce<br/>(1)minute<br/>(3)minutes<br/>(9)minutes<br/>(u)ntil-quit<br/>(f)orever</p>') # noqa
             elif key == 65: # a
                 self.granularity = 'args-and-path'
             elif key == 74: # j

@@ -83,7 +83,7 @@ def _tail_execve(proc):
                 logging.debug(f'bad execve line: {[line]}')
             else:
                 filenames[pid] = path, ' '.join(args)
-    logging.error('tail execve prematurely')
+    logging.error('tail execve exited prematurely')
     sys.exit(1)
 
 def _tail_tcp_udp(proc):
@@ -105,7 +105,7 @@ def _tail_tcp_udp(proc):
                 start = time.monotonic()
                 pids[(daddr, dport, saddr, sport)] = pid, start
                 pids[(saddr, sport, daddr, dport)] = pid, start
-    logging.error('tail exited prematurely')
+    logging.error('tail tcp/udp exited prematurely')
     sys.exit(1)
 
 def _tail_exit(proc):
@@ -124,7 +124,7 @@ def _tail_exit(proc):
                 logging.error(f'bad exit line: {[line]}')
             else:
                 filenames.pop(pid, None)
-    logging.error('tail exited prematurely')
+    logging.error('tail exit exited prematurely')
     sys.exit(1)
 
 def _tail_fork(proc):
@@ -146,7 +146,7 @@ def _tail_fork(proc):
                     filenames[child_pid] = filenames[pid]
                 except KeyError:
                     pass
-    logging.error('tail fork prematurely')
+    logging.error('tail fork exited prematurely')
     sys.exit(1)
 
 pairs = [

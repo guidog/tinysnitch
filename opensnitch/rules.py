@@ -32,7 +32,7 @@ REPEAT = ffi.cast('int', 2)
 
 _durations = {'once', '1-minute', '3-minutes', '9-minutes', 'until-quit', 'forever'}
 _scopes = {'port-domain', 'domain'}
-_granularity = 'just-path', 'args-and-path'
+_granularities = {'just-path', 'args-and-path'}
 _actions = {'yes', 'no'}
 _rules_file = '/etc/opensnitch.rules'
 _rules = {}
@@ -110,7 +110,7 @@ def check(conn, prompt=True):
                 return
             duration, scope, action, granularity = opensnitch.shell.co(f'DISPLAY=:0 opensnitch-prompt "{opensnitch.conn.format(conn)}" 2>/dev/null').split()
         except:
-            logging.exception('failed run opensnitch-prompt')
+            logging.error('failed run opensnitch-prompt')
             return opensnitch.rules.DENY
         else:
             if granularity == 'just-path':

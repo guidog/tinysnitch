@@ -52,6 +52,6 @@ def format(conn):
     src = opensnitch.dns.get_hostname(src)
     dst = opensnitch.dns.get_hostname(dst)
     if dst == opensnitch.dns.hostname:
-        return ' '.join(f'{proto} | {dst}:{dst_port} <- {src}:{src_port} | {pid} {path} {args}'.split())
+        return ' '.join(f'{proto} | {dst}:{dst_port} <- {src}:{src_port} | {pid} {path} | {args}'.split())
     else:
-        return ' '.join(f'{proto} | {src}:{src_port} -> {dst}:{dst_port} | {pid} {path} {args}'.split())
+        return ' '.join(f'{proto} | {src}:{src_port} -> {dst}:{dst_port} | {pid} {path} | {args}'.split())

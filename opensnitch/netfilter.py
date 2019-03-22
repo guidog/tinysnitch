@@ -109,9 +109,10 @@ def _py_callback(data, length):
         checksum = xxhash.xxh64_hexdigest(unpacked) # TODO update to xx3hash
         _repeats_start[checksum] = time.monotonic()
         _repeats[checksum] += 1
-        if _repeats[checksum] > 100: # this has to be high to give trace.py a chance to catch up, otherwise you are missing pid/path/args data often
+        if _repeats[checksum] > 15: # give trace.py a chance to catch up, otherwise you are missing pid/path/args data
             action = opensnitch.rules.check(conn)
         else:
+            time.sleep(.01 * _repeats[checksum]) # is this better than or good in addition to a (r)epeat option in the prompt? this is NOT part of the hotloop, get rules setup to get out of this path
             action = opensnitch.rules.REPEAT
     else:
         if dst in opensnitch.dns.localhosts and src_port == 53: # auto allow and dont double print dns packets, the only ones we track after --ctstate NEW, so that we can log the solved addr
