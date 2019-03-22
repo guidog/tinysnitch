@@ -150,7 +150,7 @@ def _gc():
         pids = set(opensnitch.shell.co("ps -e | awk '{print $1}'").splitlines())
         for k, (action, duration, start) in list(_rules.items()):
             dst, dst_port, proto, path, args = k
-            if isinstance(duration, int) and time.monotonic() - start < duration:
+            if isinstance(duration, int) and time.monotonic() - start > duration:
                 logging.info(f'rule expired: {action} {dst} {dst_port} {proto} {path} {args}')
                 del _rules[k]
             if isinstance(duration, str) and duration != 'forever' and duration not in pids:
