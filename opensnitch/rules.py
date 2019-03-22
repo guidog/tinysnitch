@@ -32,13 +32,14 @@ REPEAT = ffi.cast('int', 2)
 
 _durations = {'once', '1-minute', '3-minutes', '9-minutes', 'until-quit', 'forever'}
 _scopes = {'port-domain', 'domain'}
+_granularity = 'just-path', 'args-and-path'
 _actions = {'yes', 'no'}
 _rules_file = '/etc/opensnitch.rules'
 _rules = {}
 
 def parse_rule(line):
     try:
-        action, dst, dst_port, proto, path = line.split()
+        action, dst, dst_port, proto, path, args = line.split(None, 5)
     except ValueError:
         logging.error(f'invalid rule, should have been "action dst dst_port proto path", was: {line}')
         return
@@ -57,62 +58,84 @@ def parse_rule(line):
         logging.error(f'invalid rule: {line}')
         logging.error(f'bad action, should be one of {_actions}, was: {action}')
         return
-    return action, dst, dst_port, proto, path
+    return action, dst, dst_port, proto, path, args
 
 def persist_rule(k, v):
-    dst, dst_port, proto, path = k
+    dst, dst_port, proto, path, args = k
     action, _duration, _start = v
     with open(_rules_file, 'a') as f:
-        f.write(f'{action} {dst} {dst_port} {proto} {path}\n')
+        f.write(f'{action} {dst} {dst_port} {proto} {path} {args}\n')
 
 def load_permanent_rules():
     try:
         with open(_rules_file) as f:
-            lines = f.read()
+            lines = reversed(f.read().splitlines()) # lines at top of file are higher priority
     except FileNotFoundError:
         with open(_rules_file, 'w') as f:
             lines = []
+    i = 0
     for i, line in enumerate(lines):
         rule = parse_rule(line)
         if rule:
-            action, dst, dst_port, proto, path = rule
-            logging.info(f'loaded rule: {action, dst, dst_port, proto, path}')
-            _rules[(dst, dst_port, proto, path)] = action, None, None
-    logging.info(f'loaded {i + 1} rules from: {_rules_file}')
+            action, dst, dst_port, proto, path, args = rule
+            _rules[(dst, dst_port, proto, path, args)] = action, None, None
+    for (dst, dst_port, proto, path, args), (action, _, _) in sorted(_rules.items()):
+        logging.info(f'loaded rule: {action} {dst} {dst_port} {proto} {path} {args}')
+    if list(lines):
+        logging.info(f'loaded {i + 1} rules from: {_rules_file}')
     opensnitch.trace.run_thread(_gc)
 
-def check(conn):
-    src, dst, _src_port, dst_port, proto, pid, path, _args = conn
+def check(conn, prompt=True):
+    src, dst, _src_port, dst_port, proto, pid, path, args = conn
+    src = opensnitch.dns.get_hostname(src)
+    dst = opensnitch.dns.get_hostname(dst)
     try:
-        try:
-            key = dst, dst_port, proto, path
-            rule = _rules[key]
-        except KeyError:
-            key = dst, '-', proto, path
-            rule = _rules[key]
-    except KeyError:
-        duration, scope, action = opensnitch.shell.co(f'DISPLAY=:0 opensnitch-prompt "{opensnitch.conn.format(conn)}" 2>/dev/null').split()
-        if duration == 'once':
-            return ALLOW if action == 'yes' else DENY
+        keys = [
+            (dst, dst_port, proto, path, args),
+            (dst, dst_port, proto, path, '-'),
+            (dst, '-', proto, path, args),
+            (dst, '-', proto, path, '-'),
+        ]
+        for k in keys:
+            try:
+                rule = _rules[k]
+                break
+            except KeyError:
+                pass
         else:
-            if duration == 'until-quit':
-                duration = pid
-            elif '-minute' in duration:
-                minutes = int(duration.split('-')[0])
-                duration = 60 * minutes
-            elif duration == 'forever':
-                duration = None
-            if scope == 'domain':
-                dst_port = '-'
-            k = dst, dst_port, proto, path
-            v = action, duration, time.monotonic()
-            _rules[k] = v
-            if duration is None:
-                persist_rule(k, v)
-                logging.info(f'add permanent rule: {k} = {v}')
+            raise KeyError
+    except KeyError:
+        try:
+            if not prompt:
+                return
+            duration, scope, action, granularity = opensnitch.shell.co(f'DISPLAY=:0 opensnitch-prompt "{opensnitch.conn.format(conn)}" 2>/dev/null').split()
+        except:
+            logging.exception('failed run opensnitch-prompt')
+            return opensnitch.rules.DENY
+        else:
+            if granularity == 'just-path':
+                args = '-'
+            if duration == 'once':
+                return ALLOW if action == 'yes' else DENY
             else:
-                logging.info(f'add temporary rule: {k} = {v}')
-            return check(conn)
+                if duration == 'until-quit':
+                    duration = pid
+                elif '-minute' in duration:
+                    minutes = int(duration.split('-')[0])
+                    duration = 60 * minutes
+                elif duration == 'forever':
+                    duration = None
+                if scope == 'domain':
+                    dst_port = '-'
+                k = dst, dst_port, proto, path, args
+                v = action, duration, time.monotonic()
+                _rules[k] = v
+                if duration is None:
+                    persist_rule(k, v)
+                    logging.info(f'add permanent rule: {action} {dst} {dst_port} {proto} {path} {args}')
+                else:
+                    logging.info(f'add temporary rule: {action} {duration} {dst} {dst_port} {proto} {path} {args}')
+                return check(conn)
     else:
         action, duration, start = rule
         if action == 'yes':
@@ -123,14 +146,14 @@ def check(conn):
 
 def _gc():
     while True:
-        pids = set(opensnitch.shell.cd("ps -e | awk '{print $1}'").splitlines())
+        pids = set(opensnitch.shell.co("ps -e | awk '{print $1}'").splitlines())
         for k, (action, duration, start) in list(_rules.items()):
-            dst, dst_port, proto, path = k
+            dst, dst_port, proto, path, args = k
             if isinstance(duration, int) and time.monotonic() - start < duration:
-                logging.info(f'rule expired: {action, dst, dst_port, proto, path}')
+                logging.info(f'rule expired: {action} {dst} {dst_port} {proto} {path} {args}')
                 del _rules[k]
             if isinstance(duration, str) and duration != 'forever' and duration not in pids:
-                logging.info(f'rule for pid {duration} expired: {action, dst, dst_port, proto, path}')
+                logging.info(f'rule for pid {duration} expired: {action} {dst} {dst_port} {proto} {path} {args}')
                 del _rules[k]
         time.sleep(1)
     logging.error('trace gc exited prematurely')

@@ -27,8 +27,7 @@ import opensnitch.trace
 def parse(packet):
     src = packet.src
     dst = packet.dst
-    src_port = dst_port = proto = path = args = ''
-    pid = '?'
+    src_port = dst_port = proto = pid = path = args = '-'
     proto = packet.get_field('proto').i2s[packet.proto]
     if 'TCP' in packet or 'UDP' in packet:
         ip = packet['IP']

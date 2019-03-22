@@ -7,6 +7,7 @@ import argh
 
 durations = 'once', '1-minute', '3-minutes', '9-minutes', 'until-quit', 'forever'
 scopes = 'port-domain', 'domain'
+granularity = 'just-path', 'args-and-path'
 actions = 'yes', 'no'
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -27,6 +28,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, words):
         self.qt_setup()
         self.duration = 'once'
+        self.granularity = 'args-and-path'
         self.scope = 'port-domain'
         self.action = 'no'
         self.help = False
@@ -63,15 +65,19 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.duration = 'forever'
             elif key == 72: # h
                 self.help = True
-                return self.title.setText('<p style="line-height: 50px;"><span style="font-weight: bold;">actions</span><br/>(y)es<br/>(n)o<br/><br/><span style="font-weight: bold;">domains</span><br/>(d)omain<br/>(p)ort-domain<br/><br/><span style="font-weight: bold;">duration</span><br/>(o)nce<br/>(1)minute<br/>(3)minutes<br/>(9)minutes<br/>(u)ntil-quit<br/>(f)orever</p>') # noqa
+                return self.title.setText('<p style="line-height: 50px;"><span style="font-weight: bold;">actions</span><br/>(y)es<br/>(n)o<br/><br/><span style="font-weight: bold;">scope</span><br/>(d)omain<br/>(p)ort-domain<br/><br/><span style="font-weight: bold;">granularity</span><br/>(a)args-and-path<br/>(j)ust-path<br/><br/><span style="font-weight: bold;">duration</span><br/>(o)nce<br/>(1)minute<br/>(3)minutes<br/>(9)minutes<br/>(u)ntil-quit<br/>(f)orever</p>') # noqa
+            elif key == 65: # a
+                self.granularity = 'args-and-path'
+            elif key == 74: # j
+                self.granularity = 'just-path'
         self.update()
 
     def update(self):
-        self.title.setText(f'{self.text}\n\n{self.duration} {self.scope}\n\n(y)es (n)o (h)elp')
+        self.title.setText(f'{self.text}\n\n{self.duration} {self.scope} {self.granularity}\n\n(y)es (n)o (h)elp')
 
     def exit(self):
         self.update()
-        print(f'{self.duration} {self.scope} {self.action}')
+        print(f'{self.duration} {self.scope} {self.action} {self.granularity}')
         sys.exit(0)
 
 @argh.dispatch_command

@@ -25,8 +25,8 @@ import opensnitch.shell
 
 _iptables_rules = [
     "INPUT --protocol udp --sport 53 -j NFQUEUE --queue-num 0",   # catch dns packets on the way back in so we can read the resolved address
-    "OUTPUT -m conntrack --ctstate NEW -j NFQUEUE --queue-num 0", # potentially block incoming traffic
-    "INPUT -m conntrack --ctstate NEW -j NFQUEUE --queue-num 0",  # potentially block outgoing traffic
+    "OUTPUT -t mangle -m conntrack --ctstate NEW -j NFQUEUE --queue-num 0", # potentially block incoming traffic
+    "INPUT -t mangle -m conntrack --ctstate NEW -j NFQUEUE --queue-num 0",  # potentially block outgoing traffic
     "INPUT -m mark --mark 101285 -j REJECT",                      # inbound rejection mark
     "OUTPUT -m mark --mark 101285 -j REJECT",                     # outbound rejection mark
 ]
@@ -44,6 +44,7 @@ def main(setup_firewall=False, teardown_firewall=False):
     else:
         opensnitch.dns.populate_localhosts()
         opensnitch.trace.start()
+        opensnitch.rules.load_permanent_rules()
         nfq_handle, nfq_q_handle = opensnitch.netfilter.create(0)
         try:
             nfq_fd = opensnitch.netfilter.setup(nfq_handle, nfq_q_handle)

@@ -100,20 +100,25 @@ def _py_callback(data, length):
     conn = opensnitch.conn.parse(packet)
     try:
         conn = opensnitch.conn.add_meta(conn)
+        src, dst, src_port, dst_port, proto, pid, path, args = conn
     except KeyError:
-        checksum = xxhash.xxh64_hexdigest(unpacked)
+        src, dst, src_port, dst_port, proto, pid, path, args = conn
+        action = opensnitch.rules.check(conn, prompt=False)
+        if action:
+            return action
+        checksum = xxhash.xxh64_hexdigest(unpacked) # TODO update to xx3hash
         _repeats_start[checksum] = time.monotonic()
         _repeats[checksum] += 1
-        if _repeats[checksum] > 4:
+        if _repeats[checksum] > 10:
             action = opensnitch.rules.check(conn)
         else:
             action = opensnitch.rules.REPEAT
     else:
+        if dst in opensnitch.dns.localhosts and src_port == 53: # auto allow and dont double print dns packets, the only ones we track after --ctstate NEW, so that we can log the solved addr
+            return opensnitch.rules.ALLOW
         action = opensnitch.rules.check(conn)
     if action is opensnitch.rules.ALLOW:
-        src, dst, src_port, dst_port, proto, pid, path, args = conn
-        if not (dst in opensnitch.dns.localhosts and src_port == 53): # dont double print dns packets, the only ones we track after --ctstate NEW, so that we can log the solved addr
-            logging.info(f'allow: {opensnitch.conn.format(conn)}')
+        logging.info(f'allow: {opensnitch.conn.format(conn)}')
     elif action is opensnitch.rules.DENY:
         logging.info(f'deny: {opensnitch.conn.format(conn)}')
     return action
