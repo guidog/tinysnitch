@@ -40,6 +40,7 @@ _rules_file = '/etc/opensnitch.rules'
 _rules = {}
 _last_sleep = {'seconds': time.monotonic()}
 prompts = {}
+waiting = {}
 
 def parse_rule(line):
     try:
@@ -122,6 +123,7 @@ def check(conn, prompt=True):
         if prompts.get(conn) is not None:
             return prompts.pop(conn)
         elif prompts:
+            waiting[conn] = time.monotonic()
             now = time.monotonic()
             if now - _last_sleep['seconds'] > .001:
                 _last_sleep['seconds'] = now
@@ -130,6 +132,7 @@ def check(conn, prompt=True):
                     logging.info(f"spinning {int(time.time())} {pprint.pformat(prompts)}")
             return opensnitch.rules.REPEAT
         else:
+            waiting.pop(conn, None)
             prompts[conn] = None
             opensnitch.trace.run_thread(_prompt, pid, conn)
             return opensnitch.rules.REPEAT
@@ -181,6 +184,7 @@ def _process_rule(pid, conn, duration, scope, action, granularity):
 
 def _gc():
     while True:
+        logging.info(f"sizes: prompts={len(prompts)} waiting={len(waiting)} pids={len(opensnitch.trace.pids)} exits={len(opensnitch.trace.exits)} filenames={len(opensnitch.trace.filenames)}")
         pids = set(opensnitch.shell.co("ps -e | awk '{print $1}'").splitlines())
         for k, (action, duration, start) in list(_rules.items()):
             dst, dst_port, proto, path, args = k

@@ -28,8 +28,8 @@ import opensnitch.shell
 import subprocess
 
 # TODO this is way to high, just check if it changes behavior. gc both by age and by total count pruning oldest
-pids_ttl = 60 * 60 * 24
-filenames_ttl = 60 * 60 * 24
+pids_ttl = 5
+filenames_ttl = 5
 pids = {}
 exits = {}
 filenames = {}
@@ -65,11 +65,13 @@ def _gc():
     while True:
         now = time.monotonic()
         prompt_pids = {pid for src, dst, src_port, dst_port, proto, pid, path, args in opensnitch.rules.prompts}
-        for (src, src_port, dst, dst_port), (pid, start) in list(pids.items()):
-            if now - start > pids_ttl and pid not in prompt_pids:
-                del pids[(src, src_port, dst, dst_port)]
+        waiting_pids = {pid for src, dst, src_port, dst_port, proto, pid, path, args in opensnitch.rules.waiting}
+        all_pids = prompt_pids | waiting_pids
+        for k, (pid, start) in list(pids.items()):
+            if now - start > pids_ttl and pid not in all_pids:
+                del pids[k]
         for pid, start in list(exits.items()):
-            if now - start > filenames_ttl and pid not in prompt_pids:
+            if now - start > filenames_ttl and pid not in all_pids:
                 logging.info(f'gc exited pid: {filenames[pid]}')
                 del exits[pid]
                 del filenames[pid]
@@ -132,6 +134,7 @@ def _tail_exit(proc):
             except ValueError:
                 logging.error(f'bad exit line: {[line]}')
             else:
+                # TODO pids here is not keyed by pid
                 if pid in pids: # are we tracking this pid
                     logging.info(f'exited: {filenames[pid]}')
                     exits[pid] = time.monotonic()

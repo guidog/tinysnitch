@@ -46,8 +46,7 @@ import xxhash
 
 _repeats = collections.defaultdict(int)
 _repeats_start = {}
-# TODO this is way to high, just check if it changes behavior. gc both by age and by total count pruning oldest
-_repeats_ttl = 60 * 60 * 24
+_repeats_ttl = 5
 
 _AF_INET = ffi.cast('int', 2)
 _AF_INET6 = ffi.cast('int', 10)
