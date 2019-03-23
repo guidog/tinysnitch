@@ -129,7 +129,7 @@ def check(conn, prompt=True):
                 _last_sleep['seconds'] = now
                 time.sleep(.001)
                 if random.random() > .99:
-                    logging.info(f"spinning {int(time.time())} {pprint.pformat(prompts)}")
+                    logging.info(f"spinning {int(time.time())}\n{prompts}\n {conn}")
             return opensnitch.rules.REPEAT
         else:
             waiting.pop(conn, None)
