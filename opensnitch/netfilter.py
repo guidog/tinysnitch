@@ -46,6 +46,8 @@ import xxhash
 
 _repeats = collections.defaultdict(int)
 _repeats_start = {}
+# TODO this is way to high, just check if it changes behavior. gc both by age and by total count pruning oldest
+_repeats_ttl = 60 * 60 * 24
 
 _AF_INET = ffi.cast('int', 2)
 _AF_INET6 = ffi.cast('int', 10)
@@ -85,7 +87,7 @@ def _gc():
     while True:
         now = time.monotonic()
         for checksum, start in list(_repeats_start.items()):
-            if now - start > opensnitch.trace.seconds:
+            if now - start > _repeats_ttl:
                 del _repeats[checksum]
                 del _repeats_start[checksum]
         time.sleep(1)
@@ -109,10 +111,9 @@ def _py_callback(data, length):
         checksum = xxhash.xxh64_hexdigest(unpacked) # TODO update to xx3hash
         _repeats_start[checksum] = time.monotonic()
         _repeats[checksum] += 1
-        if _repeats[checksum] > 15: # give trace.py a chance to catch up, otherwise you are missing pid/path/args data
+        if _repeats[checksum] > 1000: # give trace.py a chance to catch up, otherwise you are missing pid/path/args data
             action = opensnitch.rules.check(conn)
         else:
-            time.sleep(.01 * _repeats[checksum]) # is this better than or good in addition to a (r)epeat option in the prompt? this is NOT part of the hotloop, get rules setup to get out of this path
             action = opensnitch.rules.REPEAT
     else:
         if dst in opensnitch.dns.localhosts and src_port == 53: # auto allow and dont double print dns packets, the only ones we track after --ctstate NEW, so that we can log the solved addr

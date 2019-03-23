@@ -27,8 +27,11 @@ import signal
 import opensnitch.shell
 import subprocess
 
-seconds = 15
+# TODO this is way to high, just check if it changes behavior. gc both by age and by total count pruning oldest
+pids_ttl = 60 * 60 * 24
+filenames_ttl = 60 * 60 * 24
 pids = {}
+exits = {}
 filenames = {}
 
 def run_thread(fn, *a, **kw):
@@ -61,9 +64,15 @@ def _monitor(proc):
 def _gc():
     while True:
         now = time.monotonic()
-        for k, (_pid, start) in list(pids.items()):
-            if now - start > seconds:
-                del pids[k]
+        prompt_pids = {pid for src, dst, src_port, dst_port, proto, pid, path, args in opensnitch.rules.prompts}
+        for (src, src_port, dst, dst_port), (pid, start) in list(pids.items()):
+            if now - start > pids_ttl and pid not in prompt_pids:
+                del pids[(src, src_port, dst, dst_port)]
+        for pid, start in list(exits.items()):
+            if now - start > filenames_ttl and pid not in prompt_pids:
+                logging.info(f'gc exited pid: {filenames[pid]}')
+                del exits[pid]
+                del filenames[pid]
         time.sleep(1)
     logging.error('trace gc exited prematurely')
     sys.exit(1)
@@ -123,7 +132,9 @@ def _tail_exit(proc):
             except ValueError:
                 logging.error(f'bad exit line: {[line]}')
             else:
-                filenames.pop(pid, None)
+                if pid in pids: # are we tracking this pid
+                    logging.info(f'exited: {filenames[pid]}')
+                    exits[pid] = time.monotonic()
     logging.error('tail exit exited prematurely')
     sys.exit(1)
 

@@ -17,6 +17,8 @@
 # or write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
+import random
+import pprint
 import time
 import sys
 import logging
@@ -36,12 +38,14 @@ _granularities = {'just-path', 'args-and-path'}
 _actions = {'yes', 'no'}
 _rules_file = '/etc/opensnitch.rules'
 _rules = {}
+_last_sleep = {'seconds': time.monotonic()}
+prompts = {}
 
 def parse_rule(line):
     try:
         action, dst, dst_port, proto, path, args = line.split(None, 5)
     except ValueError:
-        logging.error(f'invalid rule, should have been "action dst dst_port proto path", was: {line}')
+        logging.exception(f'invalid rule, should have been "action dst dst_port proto path args", was: {line}')
         return
     try:
         if dst_port != '-':
@@ -74,21 +78,29 @@ def load_permanent_rules():
         with open(_rules_file, 'w') as f:
             lines = []
     i = 0
+    lines = [l.split('#')[-1] for l in lines]
+    lines = [l for l in lines if l.strip()]
     for i, line in enumerate(lines):
         rule = parse_rule(line)
         if rule:
             action, dst, dst_port, proto, path, args = rule
             _rules[(dst, dst_port, proto, path, args)] = action, None, None
     for (dst, dst_port, proto, path, args), (action, _, _) in sorted(_rules.items(), key=str):
-        logging.info(f'loaded rule: {action} {dst} {dst_port} {proto} {path} {args}')
+        logging.debug(f'loaded rule: {action} {dst} {dst_port} {proto} {path} {args}')
     if list(lines):
         logging.info(f'loaded {i + 1} rules from: {_rules_file}')
     opensnitch.trace.run_thread(_gc)
 
-def check(conn, prompt=True):
-    src, dst, _src_port, dst_port, proto, pid, path, args = conn
+def _resolve_hostnames(conn):
+    src, dst, src_port, dst_port, proto, pid, path, args = conn
     src = opensnitch.dns.get_hostname(src)
     dst = opensnitch.dns.get_hostname(dst)
+    conn = src, dst, src_port, dst_port, proto, pid, path, args
+    return conn
+
+def check(conn, prompt=True):
+    conn = _resolve_hostnames(conn)
+    src, dst, _src_port, dst_port, proto, pid, path, args = conn
     try:
         keys = [
             (dst, dst_port, proto, path, args),
@@ -105,45 +117,67 @@ def check(conn, prompt=True):
         else:
             raise KeyError
     except KeyError:
-        try:
-            if not prompt:
-                return
-            duration, scope, action, granularity = opensnitch.shell.co(f'DISPLAY=:0 opensnitch-prompt "{opensnitch.conn.format(conn)}" 2>/dev/null').split()
-        except:
-            logging.error('failed run opensnitch-prompt')
-            return opensnitch.rules.DENY
+        if not prompt:
+            return
+        if prompts.get(conn) is not None:
+            return prompts.pop(conn)
+        elif prompts:
+            now = time.monotonic()
+            if now - _last_sleep['seconds'] > .001:
+                _last_sleep['seconds'] = now
+                time.sleep(.001)
+                if random.random() > .99:
+                    logging.info(f"spinning {int(time.time())} {pprint.pformat(prompts)}")
+            return opensnitch.rules.REPEAT
         else:
-            if granularity == 'just-path':
-                args = '-'
-            if duration == 'once':
-                return ALLOW if action == 'yes' else DENY
-            else:
-                _duration = duration
-                if duration == 'until-quit':
-                    duration = pid
-                elif '-minute' in duration:
-                    minutes = int(duration.split('-')[0])
-                    duration = 60 * minutes
-                elif duration == 'forever':
-                    duration = None
-                if scope == 'domain':
-                    dst_port = '-'
-                k = dst, dst_port, proto, path, args
-                v = action, duration, time.monotonic()
-                _rules[k] = v
-                if duration is None:
-                    persist_rule(k, v)
-                    logging.info(f'add permanent rule: {action} {dst} {dst_port} {proto} {path} {args}')
-                else:
-                    logging.info(f'add temporary rule: {action} {_duration} {dst} {dst_port} {proto} {path} {args}')
-                return check(conn)
+            prompts[conn] = None
+            opensnitch.trace.run_thread(_prompt, pid, conn)
+            return opensnitch.rules.REPEAT
     else:
-        action, duration, start = rule
+        action, _duration, _start = rule
         if action == 'yes':
             return ALLOW
         elif action == 'no':
             return DENY
         assert False
+
+def _prompt(pid, conn):
+    try:
+        duration, scope, action, granularity = opensnitch.shell.co(f'DISPLAY=:0 opensnitch-prompt "{opensnitch.conn.format(conn)}" 2>/dev/null').split()
+    except:
+        logging.error('failed run opensnitch-prompt')
+        action = opensnitch.rules.DENY
+    else:
+        action = _process_rule(pid, conn, duration, scope, action, granularity)
+    prompts[conn] = action
+
+def _process_rule(pid, conn, duration, scope, action, granularity):
+    src, dst, _src_port, dst_port, proto, pid, path, args = conn
+    if granularity == 'just-path':
+        args = '-'
+    args = args or '-'
+    if duration == 'once':
+        return ALLOW if action == 'yes' else DENY
+    else:
+        _duration = duration
+        if duration == 'until-quit':
+            duration = pid
+        elif '-minute' in duration:
+            minutes = int(duration.split('-')[0])
+            duration = 60 * minutes
+        elif duration == 'forever':
+            duration = None
+        if scope == 'domain':
+            dst_port = '-'
+        k = dst, dst_port, proto, path, args
+        v = action, duration, time.monotonic()
+        _rules[k] = v
+        if duration is None:
+            persist_rule(k, v)
+            logging.info(f'add permanent rule: {action} {dst} {dst_port} {proto} {path} {args}')
+        else:
+            logging.info(f'add temporary rule: {action} {_duration} {dst} {dst_port} {proto} {path} {args}')
+        return check(conn)
 
 def _gc():
     while True:
