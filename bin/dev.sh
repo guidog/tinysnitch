@@ -9,6 +9,7 @@ find -type f \
 find -type f \
     | grep -E "\.c$|\.o$|\.so$" \
     | xargs rm -fv
+
 ./bin/opensnitchd
 
 '
