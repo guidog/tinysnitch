@@ -21,10 +21,10 @@
 # or write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
+import sys
 import time
 import logging
-import opensnitch.shell
-import opensnitch.trace
+import opensnitch.lib
 from scapy.layers.dns import DNS
 from scapy.layers.inet import UDP
 
@@ -43,7 +43,7 @@ def _decode(x):
 def start():
     _populate_localhosts()
     _populate_hosts()
-    opensnitch.trace.run_thread(_persister)
+    opensnitch.lib.run_thread(_persister)
 
 def _populate_hosts():
     try:
@@ -58,7 +58,7 @@ def _populate_hosts():
         logging.debug(f'load dns: {hostname} {addr}')
 
 def _populate_localhosts():
-    for line in opensnitch.shell.co('ip a | grep inet').splitlines():
+    for line in opensnitch.lib.check_output('ip a | grep inet').splitlines():
         _, addr, *_ = line.strip().split()
         addr = addr.split('/')[0]
         hosts[addr] = hostname
@@ -100,3 +100,12 @@ def _persister():
                 else:
                     f.write(f'{addr} {hosts[addr]}\n')
         time.sleep(1)
+    logging.fatal('dns persister exited prematurely')
+    sys.exit(1)
+
+def resolve(conn):
+    src, dst, src_port, dst_port, proto, pid, path, args = conn
+    src = get_hostname(src)
+    dst = get_hostname(dst)
+    conn = src, dst, src_port, dst_port, proto, pid, path, args
+    return conn

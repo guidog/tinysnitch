@@ -18,13 +18,9 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
 import time
-import threading
 import logging
 import sys
-import functools
-import os
-import signal
-import opensnitch.shell
+import opensnitch.lib
 import subprocess
 
 # TODO this is way to high, just check if it changes behavior. gc both by age and by total count pruning oldest
@@ -33,33 +29,6 @@ filenames_ttl = 5
 pids = {}
 exits = {}
 filenames = {}
-
-def run_thread(fn, *a, **kw):
-    obj = threading.Thread(target=_exceptions_kill_parent(fn), args=a, kwargs=kw)
-    obj.daemon = True
-    obj.start()
-
-def _exceptions_kill_parent(decoratee):
-    pid = os.getpid()
-    @functools.wraps(decoratee)
-    def decorated(*a, **kw):
-        try:
-            return decoratee(*a, **kw)
-        except SystemExit:
-            os.kill(pid, signal.SIGTERM)
-        except:
-            logging.exception('')
-            os.kill(pid, signal.SIGTERM)
-    return decorated
-
-def _monitor(proc):
-    while True:
-        if proc.poll() is not None:
-            logging.error('bpftrace exited prematurely')
-            sys.exit(1)
-        time.sleep(1)
-    logging.error('_monitor exited prematurely')
-    sys.exit(1)
 
 def _gc():
     while True:
@@ -163,16 +132,8 @@ def _tail_fork(proc):
     logging.error('tail fork exited prematurely')
     sys.exit(1)
 
-pairs = [
-    ('opensnitch-bpftrace-tcp', _tail_tcp_udp),
-    ('opensnitch-bpftrace-udp', _tail_tcp_udp),
-    ('opensnitch-bpftrace-fork', _tail_fork),
-    ('opensnitch-bpftrace-exit', _tail_exit),
-    ('opensnitch-bcc-execve', _tail_execve),
-]
-
 def _load_existing_pids():
-    xs = opensnitch.shell.co('ps -ef | sed 1d').splitlines()
+    xs = opensnitch.lib.check_output('ps -ef | sed 1d').splitlines()
     xs = (x.split(None, 7) for x in xs)
     xs = ((pid, path) for uid, pid, ppid, c, stime, tty, time, path in xs)
     xs = ((pid, path) for pid, path in xs if not path.startswith('['))
@@ -183,16 +144,24 @@ def _load_existing_pids():
             args = ''
         if '/' not in path:
             try:
-                path = opensnitch.shell.co(f'sudo ls -l /proc/{pid}/exe 2>/dev/null').split(' -> ')[-1]
+                path = opensnitch.lib.check_output(f'sudo ls -l /proc/{pid}/exe 2>/dev/null').split(' -> ')[-1]
             except subprocess.CalledProcessError:
                 pass
         filenames[pid] = path, args
 
+pairs = [
+    ('opensnitch-bpftrace-tcp', _tail_tcp_udp),
+    ('opensnitch-bpftrace-udp', _tail_tcp_udp),
+    ('opensnitch-bpftrace-fork', _tail_fork),
+    ('opensnitch-bpftrace-exit', _tail_exit),
+    ('opensnitch-bcc-execve', _tail_execve),
+]
+
 def start():
     _load_existing_pids()
-    run_thread(_gc)
+    opensnitch.lib.run_thread(_gc)
     for program, tail in pairs:
         proc = subprocess.Popen(['stdbuf', '-oL', program], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        run_thread(_monitor, proc)
-        run_thread(tail, proc)
+        opensnitch.lib.run_thread(opensnitch.lib.monitor, proc)
+        opensnitch.lib.run_thread(tail, proc)
         logging.info(f'started trace: {program}')

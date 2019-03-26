@@ -37,7 +37,7 @@ import logging
 import opensnitch.conn
 import opensnitch.dns
 import opensnitch.rules
-import opensnitch.trace
+import opensnitch.lib
 import scapy.layers.inet
 import sys
 import time
@@ -73,7 +73,7 @@ def setup(nfq_handle, nfq_q_handle):
     return nfq_fd
 
 def run(nfq_handle, nfq_fd):
-    opensnitch.trace.run_thread(_gc)
+    opensnitch.lib.run_thread(_gc)
     assert lib.run(nfq_handle, nfq_fd) == 0
 
 def destroy(nfq_q_handle, nfq_handle):
@@ -90,7 +90,7 @@ def _gc():
                 del _repeats[checksum]
                 del _repeats_start[checksum]
         time.sleep(1)
-    logging.error('trace gc exited prematurely')
+    logging.error('netfilter gc exited prematurely')
     sys.exit(1)
 
 @ffi.def_extern()

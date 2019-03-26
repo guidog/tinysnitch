@@ -21,7 +21,7 @@ import logging
 import opensnitch.dns
 import opensnitch.netfilter
 import opensnitch.trace
-import opensnitch.shell
+import opensnitch.lib
 
 _iptables_rules = [
     "INPUT --protocol udp --sport 53 -j NFQUEUE --queue-num 0",   # catch dns packets on the way back in so we can read the resolved address
@@ -31,16 +31,18 @@ _iptables_rules = [
     "OUTPUT -m mark --mark 101285 -j REJECT",                     # outbound rejection mark
 ]
 
-assert opensnitch.shell.co('whoami') == 'root', 'opensnitchd must run as root'
+assert opensnitch.lib.check_output('whoami') == 'root', 'opensnitchd must run as root'
+
+# logging.info(f"sizes: prompts={len(prompts)} waiting={len(waiting)} pids={len(opensnitch.trace.pids)} exits={len(opensnitch.trace.exits)} filenames={len(opensnitch.trace.filenames)}")
 
 def main(setup_firewall=False, teardown_firewall=False):
     logging.basicConfig(level='INFO', format='%(message)s')
     if setup_firewall:
         for rule in _iptables_rules:
-            opensnitch.shell.cc('iptables -I', rule)
+            opensnitch.lib.check_call('iptables -I', rule)
     elif teardown_firewall:
         for rule in _iptables_rules:
-            opensnitch.shell.cc('iptables -D', rule, '|| echo failed to delete:', rule)
+            opensnitch.lib.check_call('iptables -D', rule, '|| echo failed to delete:', rule)
     else:
         opensnitch.dns.start()
         opensnitch.trace.start()

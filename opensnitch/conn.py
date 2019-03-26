@@ -51,8 +51,6 @@ def format(conn):
     src, dst, src_port, dst_port, proto, pid, path, args = conn
     if pid in opensnitch.trace.exits:
         pid = f'exited {pid}'
-    src = opensnitch.dns.get_hostname(src)
-    dst = opensnitch.dns.get_hostname(dst)
     if dst == opensnitch.dns.hostname:
         return ' '.join(f'{proto} | {dst}:{dst_port} <- {src}:{src_port} | {pid} {path} | {args}'.split())
     else:

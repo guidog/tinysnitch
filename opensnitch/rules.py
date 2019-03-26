@@ -18,12 +18,11 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
 import random
-import pprint
 import time
 import sys
 import logging
 import opensnitch.conn
-import opensnitch.shell
+import opensnitch.lib
 import opensnitch.trace
 from opensnitch._netfilter import ffi
 
@@ -42,7 +41,7 @@ _last_sleep = {'seconds': time.monotonic()}
 prompts = {}
 waiting = {}
 
-def parse_rule(line):
+def _parse_rule(line):
     try:
         action, dst, dst_port, proto, path, args = line.split(None, 5)
     except ValueError:
@@ -65,7 +64,7 @@ def parse_rule(line):
         return
     return action, dst, dst_port, proto, path, args
 
-def persist_rule(k, v):
+def _persist_rule(k, v):
     dst, dst_port, proto, path, args = k
     action, _duration, _start = v
     with open(_rules_file, 'a') as f:
@@ -82,7 +81,7 @@ def load_permanent_rules():
     lines = [l.split('#')[-1] for l in lines]
     lines = [l for l in lines if l.strip()]
     for i, line in enumerate(lines):
-        rule = parse_rule(line)
+        rule = _parse_rule(line)
         if rule:
             action, dst, dst_port, proto, path, args = rule
             _rules[(dst, dst_port, proto, path, args)] = action, None, None
@@ -90,17 +89,9 @@ def load_permanent_rules():
         logging.debug(f'loaded rule: {action} {dst} {dst_port} {proto} {path} {args}')
     if list(lines):
         logging.info(f'loaded {i + 1} rules from: {_rules_file}')
-    opensnitch.trace.run_thread(_gc)
-
-def _resolve_hostnames(conn):
-    src, dst, src_port, dst_port, proto, pid, path, args = conn
-    src = opensnitch.dns.get_hostname(src)
-    dst = opensnitch.dns.get_hostname(dst)
-    conn = src, dst, src_port, dst_port, proto, pid, path, args
-    return conn
 
 def check(conn, prompt=True):
-    conn = _resolve_hostnames(conn)
+    conn = opensnitch.dns.resolve(conn)
     src, dst, _src_port, dst_port, proto, pid, path, args = conn
     try:
         keys = [
@@ -134,7 +125,7 @@ def check(conn, prompt=True):
         else:
             waiting.pop(conn, None)
             prompts[conn] = None
-            opensnitch.trace.run_thread(_prompt, pid, conn)
+            opensnitch.lib.run_thread(_prompt, pid, conn)
             return opensnitch.rules.REPEAT
     else:
         action, _duration, _start = rule
@@ -146,7 +137,7 @@ def check(conn, prompt=True):
 
 def _prompt(pid, conn):
     try:
-        duration, scope, action, granularity = opensnitch.shell.co(f'DISPLAY=:0 opensnitch-prompt "{opensnitch.conn.format(conn)}" 2>/dev/null').split()
+        duration, scope, action, granularity = opensnitch.lib.check_output(f'DISPLAY=:0 opensnitch-prompt "{opensnitch.conn.format(conn)}" 2>/dev/null').split()
     except:
         logging.error('failed run opensnitch-prompt')
         action = opensnitch.rules.DENY
@@ -176,7 +167,7 @@ def _process_rule(pid, conn, duration, scope, action, granularity):
         v = action, duration, time.monotonic()
         _rules[k] = v
         if duration is None:
-            persist_rule(k, v)
+            _persist_rule(k, v)
             logging.info(f'add permanent rule: {action} {dst} {dst_port} {proto} {path} {args}')
         else:
             logging.info(f'add temporary rule: {action} {_duration} {dst} {dst_port} {proto} {path} {args}')
@@ -184,7 +175,6 @@ def _process_rule(pid, conn, duration, scope, action, granularity):
 
 def _gc():
     while True:
-        logging.info(f"sizes: prompts={len(prompts)} waiting={len(waiting)} pids={len(opensnitch.trace.pids)} exits={len(opensnitch.trace.exits)} filenames={len(opensnitch.trace.filenames)}")
         pids = set(opensnitch.shell.co("ps -e | awk '{print $1}'").splitlines())
         for k, (action, duration, start) in list(_rules.items()):
             dst, dst_port, proto, path, args = k
