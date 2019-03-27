@@ -73,7 +73,7 @@ def setup(nfq_handle, nfq_q_handle):
     return nfq_fd
 
 def run(nfq_handle, nfq_fd):
-    opensnitch.lib.run_thread(_gc)
+    # opensnitch.lib.run_thread(_gc)
     assert lib.run(nfq_handle, nfq_fd) == 0
 
 def destroy(nfq_q_handle, nfq_handle):
@@ -115,7 +115,7 @@ def _py_callback(data, length):
         else:
             action = opensnitch.rules.REPEAT
     else:
-        if dst in opensnitch.dns.localhosts and src_port == 53: # auto allow and dont double print dns packets, the only ones we track after --ctstate NEW, so that we can log the solved addr
+        if dst in opensnitch.dns.state.localhosts and src_port == 53: # auto allow and dont double print dns packets, the only ones we track after --ctstate NEW, so that we can log the solved addr
             return opensnitch.rules.ALLOW
         action = opensnitch.rules.check(conn)
     if action is opensnitch.rules.ALLOW:

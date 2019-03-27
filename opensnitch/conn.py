@@ -43,13 +43,13 @@ def add_meta(conn):
     # opensnitch-bpftrace-udp with source and dest address as 0.0.0.0
     src, dst, src_port, dst_port, proto, _pid, _path, _args = conn
     if proto in protos:
-        pid, _start = opensnitch.trace.pids[(src, src_port, dst, dst_port)]
-        path, args = opensnitch.trace.filenames[pid]
+        pid = opensnitch.trace.state.get_pid(src, src_port, dst, dst_port)
+        path, args = opensnitch.trace.state.get_filename(pid)
     return src, dst, src_port, dst_port, proto, pid, path, args
 
 def format(conn):
     src, dst, src_port, dst_port, proto, pid, path, args = conn
-    if pid in opensnitch.trace.exits:
+    if pid in opensnitch.trace.state.exits:
         pid = f'exited {pid}'
     if dst == opensnitch.dns.hostname:
         return ' '.join(f'{proto} | {dst}:{dst_port} <- {src}:{src_port} | {pid} {path} | {args}'.split())

@@ -17,10 +17,13 @@
 # or write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
+import time
+import sys
 import logging
 import opensnitch.dns
 import opensnitch.netfilter
 import opensnitch.trace
+import opensnitch.rules
 import opensnitch.lib
 
 _iptables_rules = [
@@ -33,7 +36,17 @@ _iptables_rules = [
 
 assert opensnitch.lib.check_output('whoami') == 'root', 'opensnitchd must run as root'
 
-# logging.info(f"sizes: prompts={len(prompts)} waiting={len(waiting)} pids={len(opensnitch.trace.pids)} exits={len(opensnitch.trace.exits)} filenames={len(opensnitch.trace.filenames)}")
+def log_sizes():
+    while True:
+        states = [opensnitch.dns.state, opensnitch.trace.state, opensnitch.rules.state]
+        sizes = [f'{state.__module__.split(".")[-1]}.{state.__name__}.{k}:{len(v)}'
+                 for state in states
+                 for k, v in state.__dict__.items()
+                 if isinstance(v, dict)]
+        logging.info(f"sizes: {' '.join(sizes)}")
+        time.sleep(5)
+    logging.fatal('log sizes exited prematurely')
+    sys.exit(1)
 
 def main(setup_firewall=False, teardown_firewall=False):
     logging.basicConfig(level='INFO', format='%(message)s')
@@ -44,14 +57,16 @@ def main(setup_firewall=False, teardown_firewall=False):
         for rule in _iptables_rules:
             opensnitch.lib.check_call('iptables -D', rule, '|| echo failed to delete:', rule)
     else:
+        opensnitch.lib.run_thread(log_sizes)
         opensnitch.dns.start()
         opensnitch.trace.start()
         opensnitch.rules.load_permanent_rules()
         nfq_handle, nfq_q_handle = opensnitch.netfilter.create(0)
+        main.shutdown = lambda: opensnitch.netfilter.destroy(nfq_q_handle, nfq_handle)
         try:
             nfq_fd = opensnitch.netfilter.setup(nfq_handle, nfq_q_handle)
             opensnitch.netfilter.run(nfq_handle, nfq_fd)
         except KeyboardInterrupt:
             pass
         finally:
-            opensnitch.netfilter.destroy(nfq_q_handle, nfq_handle)
+            main.shutdown()

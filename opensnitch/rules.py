@@ -31,15 +31,35 @@ DENY = ffi.cast('int', 0)
 ALLOW = ffi.cast('int', 1)
 REPEAT = ffi.cast('int', 2)
 
-_durations = {'once', '1-minute', '3-minutes', '9-minutes', 'until-quit', 'forever'}
-_scopes = {'port-domain', 'domain'}
-_granularities = {'just-path', 'args-and-path'}
 _actions = {'yes', 'no'}
 _rules_file = '/etc/opensnitch.rules'
-_rules = {}
-_last_sleep = {'seconds': time.monotonic()}
-prompts = {}
-waiting = {}
+
+class state:
+    _rules = {}
+    _last_sleep = {'seconds': time.monotonic()}
+    prompts = {}
+    waiting = {}
+
+    def pids_inflight():
+        prompt_pids  = {pid for src, dst, src_port, dst_port, proto, pid, path, args in state.prompts}
+        waiting_pids = {pid for src, dst, src_port, dst_port, proto, pid, path, args in state.waiting}
+        return prompt_pids | waiting_pids
+
+    def gc():
+        while True:
+            pids = set(opensnitch.shell.co("ps -e | awk '{print $1}'").splitlines())
+            for k, (action, duration, start) in list(state._rules.items()):
+                dst, dst_port, proto, path, args = k
+                if isinstance(duration, int) and time.monotonic() - start > duration:
+                    logging.info(f'rule expired: {action} {dst} {dst_port} {proto} {path} {args}')
+                    del state._rules[k]
+                if isinstance(duration, str) and duration != 'forever' and duration not in pids:
+                    logging.info(f'rule for pid {duration} expired: {action} {dst} {dst_port} {proto} {path} {args}')
+                    del state._rules[k]
+            time.sleep(1)
+        logging.error('trace gc exited prematurely')
+        sys.exit(1)
+
 
 def _parse_rule(line):
     try:
@@ -84,9 +104,12 @@ def load_permanent_rules():
         rule = _parse_rule(line)
         if rule:
             action, dst, dst_port, proto, path, args = rule
-            _rules[(dst, dst_port, proto, path, args)] = action, None, None
-    for (dst, dst_port, proto, path, args), (action, _, _) in sorted(_rules.items(), key=str):
-        logging.debug(f'loaded rule: {action} {dst} {dst_port} {proto} {path} {args}')
+            state._rules[(dst, dst_port, proto, path, args)] = action, None, None
+    for i, ((dst, dst_port, proto, path, args), (action, _, _)) in enumerate(sorted(state._rules.items(), key=str)):
+        logging.info(f'loaded rule: {action} {dst} {dst_port} {proto} {path} {args}')
+        if i > 20:
+            logging.info('stopped logging rules...')
+            break
     if list(lines):
         logging.info(f'loaded {i + 1} rules from: {_rules_file}')
 
@@ -102,7 +125,7 @@ def check(conn, prompt=True):
         ]
         for k in keys:
             try:
-                rule = _rules[k]
+                rule = state._rules[k]
                 break
             except KeyError:
                 pass
@@ -111,20 +134,20 @@ def check(conn, prompt=True):
     except KeyError:
         if not prompt:
             return
-        if prompts.get(conn) is not None:
-            return prompts.pop(conn)
-        elif prompts:
-            waiting[conn] = time.monotonic()
+        if state.prompts.get(conn) is not None:
+            return state.prompts.pop(conn)
+        elif state.prompts:
+            state.waiting[conn] = time.monotonic()
             now = time.monotonic()
-            if now - _last_sleep['seconds'] > .001:
-                _last_sleep['seconds'] = now
+            if now - state._last_sleep['seconds'] > .001:
+                state._last_sleep['seconds'] = now
                 time.sleep(.001)
                 if random.random() > .99:
-                    logging.info(f"spinning {int(time.time())}\n{prompts}\n {conn}")
+                    logging.info(f"spinning {int(time.time())}\n{state.prompts}\n {conn}")
             return opensnitch.rules.REPEAT
         else:
-            waiting.pop(conn, None)
-            prompts[conn] = None
+            state.waiting.pop(conn, None)
+            state.prompts[conn] = None
             opensnitch.lib.run_thread(_prompt, pid, conn)
             return opensnitch.rules.REPEAT
     else:
@@ -143,7 +166,7 @@ def _prompt(pid, conn):
         action = opensnitch.rules.DENY
     else:
         action = _process_rule(pid, conn, duration, scope, action, granularity)
-    prompts[conn] = action
+    state.prompts[conn] = action
 
 def _process_rule(pid, conn, duration, scope, action, granularity):
     src, dst, _src_port, dst_port, proto, pid, path, args = conn
@@ -165,25 +188,10 @@ def _process_rule(pid, conn, duration, scope, action, granularity):
             dst_port = '-'
         k = dst, dst_port, proto, path, args
         v = action, duration, time.monotonic()
-        _rules[k] = v
+        state._rules[k] = v
         if duration is None:
             _persist_rule(k, v)
             logging.info(f'add permanent rule: {action} {dst} {dst_port} {proto} {path} {args}')
         else:
             logging.info(f'add temporary rule: {action} {_duration} {dst} {dst_port} {proto} {path} {args}')
         return check(conn)
-
-def _gc():
-    while True:
-        pids = set(opensnitch.shell.co("ps -e | awk '{print $1}'").splitlines())
-        for k, (action, duration, start) in list(_rules.items()):
-            dst, dst_port, proto, path, args = k
-            if isinstance(duration, int) and time.monotonic() - start > duration:
-                logging.info(f'rule expired: {action} {dst} {dst_port} {proto} {path} {args}')
-                del _rules[k]
-            if isinstance(duration, str) and duration != 'forever' and duration not in pids:
-                logging.info(f'rule for pid {duration} expired: {action} {dst} {dst_port} {proto} {path} {args}')
-                del _rules[k]
-        time.sleep(1)
-    logging.error('trace gc exited prematurely')
-    sys.exit(1)

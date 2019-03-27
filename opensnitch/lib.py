@@ -58,3 +58,9 @@ def monitor(proc):
         time.sleep(1)
     logging.error('_monitor exited prematurely')
     sys.exit(1)
+
+def decode(x):
+    try:
+        return x.decode('utf-8').rstrip('.')
+    except:
+        return x.rstrip()

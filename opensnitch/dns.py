@@ -29,21 +29,17 @@ from scapy.layers.dns import DNS
 from scapy.layers.inet import UDP
 
 hostname = 'localhost'
-hosts = {}
-localhosts = set()
 _hosts_file = '/etc/opensnitch.hosts'
-_new_addrs = []
 
-def _decode(x):
-    try:
-        return x.decode('utf-8').rstrip('.')
-    except:
-        return x.rstrip()
+class state:
+    localhosts = set()
+    _hosts = {}
+    _new_addrs = []
 
 def start():
     _populate_localhosts()
     _populate_hosts()
-    opensnitch.lib.run_thread(_persister)
+    # opensnitch.lib.run_thread(_persister)
 
 def _populate_hosts():
     try:
@@ -54,58 +50,58 @@ def _populate_hosts():
             lines = []
     for line in lines:
         addr, hostname = line.split()
-        hosts[addr] = hostname
+        state._hosts[addr] = hostname
         logging.debug(f'load dns: {hostname} {addr}')
 
 def _populate_localhosts():
     for line in opensnitch.lib.check_output('ip a | grep inet').splitlines():
         _, addr, *_ = line.strip().split()
         addr = addr.split('/')[0]
-        hosts[addr] = hostname
-        localhosts.add(addr)
+        state._hosts[addr] = hostname
+        state.localhosts.add(addr)
         logging.info(f'localhost dns: {hostname} {addr}')
 
 def _parse_dns(packet):
     udp = packet['UDP']
     dns = packet['DNS']
     if int(udp.dport) == 53:
-        yield _decode(dns.qd.qname), None
+        yield opensnitch.lib.decode(dns.qd.qname), None
     elif int(udp.sport) == 53:
         for i in range(dns.ancount):
             dnsrr = dns.an[i]
-            yield _decode(dnsrr.rrname), _decode(dnsrr.rdata)
+            yield opensnitch.lib.decode(dnsrr.rrname), opensnitch.lib.decode(dnsrr.rdata)
 
 def update_hosts(packet):
     if UDP in packet and DNS in packet:
         addrs = []
         for name, addr in _parse_dns(packet):
             if addr:
-                hosts[addr] = name
+                state._hosts[addr] = name
                 addrs.append(addr)
-                _new_addrs.append(addr)
+                state._new_addrs.append(addr)
         if addrs:
             logging.info(f'dns: {name} {" ".join(addrs)}')
 
-def get_hostname(address):
-    return hosts.get(address, address)
+def _get_hostname(address):
+    return state._hosts.get(address, address)
 
 def _persister():
     while True:
         while True:
             with open(_hosts_file, 'a') as f:
                 try:
-                    addr = _new_addrs.pop()
+                    addr = state._new_addrs.pop()
                 except IndexError:
                     break
                 else:
-                    f.write(f'{addr} {hosts[addr]}\n')
+                    f.write(f'{addr} {state._hosts[addr]}\n')
         time.sleep(1)
     logging.fatal('dns persister exited prematurely')
     sys.exit(1)
 
 def resolve(conn):
     src, dst, src_port, dst_port, proto, pid, path, args = conn
-    src = get_hostname(src)
-    dst = get_hostname(dst)
+    src = _get_hostname(src)
+    dst = _get_hostname(dst)
     conn = src, dst, src_port, dst_port, proto, pid, path, args
     return conn

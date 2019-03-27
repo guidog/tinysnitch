@@ -22,31 +22,58 @@ import logging
 import sys
 import opensnitch.lib
 import subprocess
+import threading
 
-# TODO this is way to high, just check if it changes behavior. gc both by age and by total count pruning oldest
-pids_ttl = 5
-filenames_ttl = 5
-pids = {}
-exits = {}
-filenames = {}
+class state:
+    lock = threading.RLock()
+    pids_ttl = 5
+    filenames_ttl = 5
+    pids = {}
+    reverse_pids = set()
+    exits = {}
+    filenames = {}
 
-def _gc():
-    while True:
-        now = time.monotonic()
-        prompt_pids = {pid for src, dst, src_port, dst_port, proto, pid, path, args in opensnitch.rules.prompts}
-        waiting_pids = {pid for src, dst, src_port, dst_port, proto, pid, path, args in opensnitch.rules.waiting}
-        all_pids = prompt_pids | waiting_pids
-        for k, (pid, start) in list(pids.items()):
-            if now - start > pids_ttl and pid not in all_pids:
-                del pids[k]
-        for pid, start in list(exits.items()):
-            if now - start > filenames_ttl and pid not in all_pids:
-                logging.info(f'gc exited pid: {filenames[pid]}')
-                del exits[pid]
-                del filenames[pid]
-        time.sleep(1)
-    logging.error('trace gc exited prematurely')
-    sys.exit(1)
+    def get_filename(pid):
+        path, args = opensnitch.trace.state.filenames[pid]
+        return path, args
+
+    def add_filename(pid, path, args):
+        state.filenames[pid] = path, args
+
+    def get_pid(src, src_port, dst, dst_port):
+        k = src, src_port, dst, dst_port
+        pid, _start = state.pids[k]
+        return pid
+
+    def add_pid(pid, src, src_port, dst, dst_port):
+        src_port, dst_port = int(src_port), int(dst_port)
+        start = time.monotonic()
+        k1 = src, src_port, dst, dst_port
+        k2 = dst, dst_port, src, src_port
+        with state.lock:
+            state.pids[k1] = pid, start
+            state.pids[k2] = pid, start
+            state.reverse_pids.add(pid)
+
+    def gc():
+        while True:
+            now = time.monotonic()
+            pids_inflight = opensnitch.rules.state.pids_inflight()
+            for k, (pid, start) in list(state.pids.items()):
+                if now - start > state.pids_ttl and pid not in pids_inflight:
+                    logging.info(f'gc stale pid: {k}')
+                    with state.lock:
+                        del state.pids[k]
+                        state.reverse_pids.discard(pid)
+            for pid, start in list(state.exits.items()):
+                if now - start > state.filenames_ttl and pid not in pids_inflight:
+                    logging.info(f'gc exited pid: {state.filenames[pid]}')
+                    with state.lock:
+                        del state.exits[pid]
+                        del state.filenames[pid]
+            time.sleep(1)
+        logging.error('trace gc exited prematurely')
+        sys.exit(1)
 
 def _tail_execve(proc):
     while True:
@@ -62,7 +89,7 @@ def _tail_execve(proc):
             except ValueError:
                 logging.debug(f'bad execve line: {[line]}')
             else:
-                filenames[pid] = path, ' '.join(args)
+                state.add_filename(pid, path, ' '.join(args))
     logging.error('tail execve exited prematurely')
     sys.exit(1)
 
@@ -77,14 +104,11 @@ def _tail_tcp_udp(proc):
             if not line:
                 break
             try:
-                pid, _comm, saddr, sport, daddr, dport = line.split()
+                pid, _comm, src, src_port, dst, dst_port = line.split()
             except ValueError:
                 logging.error(f'bad tcp/udp line: {[line]}')
             else:
-                sport, dport = int(sport), int(dport)
-                start = time.monotonic()
-                pids[(daddr, dport, saddr, sport)] = pid, start
-                pids[(saddr, sport, daddr, dport)] = pid, start
+                state.add_pid(pid, src, src_port, dst, dst_port)
     logging.error('tail tcp/udp exited prematurely')
     sys.exit(1)
 
@@ -103,10 +127,10 @@ def _tail_exit(proc):
             except ValueError:
                 logging.error(f'bad exit line: {[line]}')
             else:
-                # TODO pids here is not keyed by pid
-                if pid in pids: # are we tracking this pid
-                    logging.info(f'exited: {filenames[pid]}')
-                    exits[pid] = time.monotonic()
+                with state.lock:
+                    if pid in state.reverse_pids:
+                        logging.info(f'exited: {state.filenames[pid]}')
+                        state.exits[pid] = time.monotonic()
     logging.error('tail exit exited prematurely')
     sys.exit(1)
 
@@ -126,7 +150,9 @@ def _tail_fork(proc):
                 logging.error(f'bad fork line: {[line]}')
             else:
                 try:
-                    filenames[child_pid] = filenames[pid]
+                    with state.lock:
+                        path, args = state.get_filename(pid)
+                        state.add_filename(pid, path, args)
                 except KeyError:
                     pass
     logging.error('tail fork exited prematurely')
@@ -147,7 +173,7 @@ def _load_existing_pids():
                 path = opensnitch.lib.check_output(f'sudo ls -l /proc/{pid}/exe 2>/dev/null').split(' -> ')[-1]
             except subprocess.CalledProcessError:
                 pass
-        filenames[pid] = path, args
+        state.add_filename(pid, path, args)
 
 pairs = [
     ('opensnitch-bpftrace-tcp', _tail_tcp_udp),
@@ -159,7 +185,7 @@ pairs = [
 
 def start():
     _load_existing_pids()
-    opensnitch.lib.run_thread(_gc)
+    # opensnitch.lib.run_thread(state.gc)
     for program, tail in pairs:
         proc = subprocess.Popen(['stdbuf', '-oL', program], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         opensnitch.lib.run_thread(opensnitch.lib.monitor, proc)
