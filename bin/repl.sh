@@ -13,7 +13,7 @@ import time
 cc = lambda *a: subprocess.check_call(' '.join(map(str, a)), shell=True, executable='/bin/bash')
 c = lambda *a: subprocess.call(' '.join(map(str, a)), shell=True, executable='/bin/bash')
 
-_watch_skips = '/.git/', '/__pycache__/', '/.backups/'
+_watch_skips = '/.git/', '/__pycache__/', '/.backups/', '.egg-'
 
 def watch(root, callback=None, skips=_watch_skips, sleep=.1):
     mtimes = {}
