@@ -22,36 +22,22 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
 import opensnitch.dns
-import opensnitch.trace
+
+_protos = {'tcp', 'udp'}
 
 def parse(packet):
     src = packet.src
     dst = packet.dst
     src_port = dst_port = proto = pid = path = args = '-'
     proto = packet.get_field('proto').i2s[packet.proto]
-    if 'TCP' in packet or 'UDP' in packet:
+    if proto in _protos:
         ip = packet['IP']
         src_port = ip.sport
         dst_port = ip.dport
     return src, dst, src_port, dst_port, proto, pid, path, args
 
-protos = {'tcp', 'udp'}
-
-def add_meta(conn):
-    # TODO add meta for the server pid on incoming connections. tcp can be seen
-    # via opensnitch-bpftrace-tcp-accept, udp can be seen via
-    # opensnitch-bpftrace-udp with source and dest address as 0.0.0.0
-    src, dst, src_port, dst_port, proto, _pid, _path, _args = conn
-    if proto in protos:
-        pid = opensnitch.trace.state.get_pid(src, src_port, dst, dst_port)
-        path, args = opensnitch.trace.state.get_filename(pid)
-    return src, dst, src_port, dst_port, proto, pid, path, args
-
-def format(conn):
-    src, dst, src_port, dst_port, proto, pid, path, args = conn
-    if pid in opensnitch.trace.state.exits:
-        pid = f'exited {pid}'
-    if dst == opensnitch.dns.hostname:
+def format(src, dst, src_port, dst_port, proto, pid, path, args):
+    if opensnitch.dns.is_localhost(dst):
         return ' '.join(f'{proto} | {dst}:{dst_port} <- {src}:{src_port} | {pid} {path} | {args}'.split())
     else:
         return ' '.join(f'{proto} | {src}:{src_port} -> {dst}:{dst_port} | {pid} {path} | {args}'.split())

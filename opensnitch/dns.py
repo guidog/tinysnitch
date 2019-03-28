@@ -23,23 +23,28 @@
 
 import sys
 import time
-import logging
 import opensnitch.lib
 from scapy.layers.dns import DNS
 from scapy.layers.inet import UDP
+from opensnitch.lib import log
 
-hostname = 'localhost'
 _hosts_file = '/etc/opensnitch.hosts'
 
 class state:
-    localhosts = set()
+    _localhosts = set()
     _hosts = {}
     _new_addrs = []
+
+def is_inbound_dns(src, dst, src_port, dst_port, proto, pid, path, args):
+    return is_localhost(dst) and src_port == 53
+
+def is_localhost(addr):
+    return addr in state._localhosts
 
 def start():
     _populate_localhosts()
     _populate_hosts()
-    # opensnitch.lib.run_thread(_persister)
+    opensnitch.lib.run_thread(_persister)
 
 def _populate_hosts():
     try:
@@ -51,15 +56,12 @@ def _populate_hosts():
     for line in lines:
         addr, hostname = line.split()
         state._hosts[addr] = hostname
-        logging.debug(f'load dns: {hostname} {addr}')
 
 def _populate_localhosts():
-    for line in opensnitch.lib.check_output('ip a | grep inet').splitlines():
+    for line in opensnitch.lib.check_output('ip a | grep inet').splitlines() + ['- localhost -']:
         _, addr, *_ = line.strip().split()
         addr = addr.split('/')[0]
-        state._hosts[addr] = hostname
-        state.localhosts.add(addr)
-        logging.info(f'localhost dns: {hostname} {addr}')
+        state._localhosts.add(addr)
 
 def _parse_dns(packet):
     udp = packet['UDP']
@@ -80,7 +82,7 @@ def update_hosts(packet):
                 addrs.append(addr)
                 state._new_addrs.append(addr)
         if addrs:
-            logging.info(f'dns: {name} {" ".join(addrs)}')
+            log(f'info: dns: {name} {" ".join(addrs)}')
 
 def _get_hostname(address):
     return state._hosts.get(address, address)
@@ -96,7 +98,7 @@ def _persister():
                 else:
                     f.write(f'{addr} {state._hosts[addr]}\n')
         time.sleep(1)
-    logging.fatal('dns persister exited prematurely')
+    log('fatal: dns persister exited prematurely')
     sys.exit(1)
 
 def resolve(conn):

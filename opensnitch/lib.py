@@ -21,10 +21,13 @@ import subprocess
 import threading
 import os
 import functools
-import logging
+import traceback
 import signal
 import sys
 import time
+
+def log(x):
+    print(x)
 
 def check_call(*a):
     subprocess.check_call(' '.join(map(str, a)), shell=True, executable='/bin/bash')
@@ -46,17 +49,17 @@ def exceptions_kill_parent(decoratee):
         except SystemExit:
             os.kill(pid, signal.SIGTERM)
         except:
-            logging.exception('')
+            traceback.print_exc()
             os.kill(pid, signal.SIGTERM)
     return decorated
 
 def monitor(proc):
     while True:
         if proc.poll() is not None:
-            logging.error('bpftrace exited prematurely')
+            log('error: bpftrace exited prematurely')
             sys.exit(1)
         time.sleep(1)
-    logging.error('_monitor exited prematurely')
+    log('error: monitor exited prematurely')
     sys.exit(1)
 
 def decode(x):
@@ -64,3 +67,6 @@ def decode(x):
         return x.decode('utf-8').rstrip('.')
     except:
         return x.rstrip()
+
+for _color, _num in zip(['red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white'], range(31, 38)):
+    locals()[_color] = functools.partial(lambda code, text: "\033[{}m{}\033[0m".format(code, text), _num)

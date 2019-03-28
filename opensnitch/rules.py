@@ -17,80 +17,100 @@
 # or write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
-import random
-import time
-import sys
-import logging
+import traceback
 import opensnitch.conn
 import opensnitch.lib
 import opensnitch.trace
-from opensnitch._netfilter import ffi
+import os
+import queue
+import sys
+import time
+from opensnitch.lib import log
 
-
-DENY = ffi.cast('int', 0)
-ALLOW = ffi.cast('int', 1)
-REPEAT = ffi.cast('int', 2)
-
-_actions = {'yes', 'no'}
+_actions = {'allow', 'deny'}
 _rules_file = '/etc/opensnitch.rules'
 
 class state:
     _rules = {}
-    _last_sleep = {'seconds': time.monotonic()}
-    prompts = {}
-    waiting = {}
+    _queue = queue.Queue(1024)
+    _delay_queue = queue.Queue(1024)
+    _prompt_queue = queue.Queue(1024)
 
-    def pids_inflight():
-        prompt_pids  = {pid for src, dst, src_port, dst_port, proto, pid, path, args in state.prompts}
-        waiting_pids = {pid for src, dst, src_port, dst_port, proto, pid, path, args in state.waiting}
-        return prompt_pids | waiting_pids
+def _add_rule(action, duration, start, dst, dst_port, proto, path, args):
+    k = dst, dst_port, proto, path, args
+    v = action, duration, start
+    state._rules[k] = v
 
-    def gc():
-        while True:
-            pids = set(opensnitch.shell.co("ps -e | awk '{print $1}'").splitlines())
-            for k, (action, duration, start) in list(state._rules.items()):
-                dst, dst_port, proto, path, args = k
-                if isinstance(duration, int) and time.monotonic() - start > duration:
-                    logging.info(f'rule expired: {action} {dst} {dst_port} {proto} {path} {args}')
-                    del state._rules[k]
-                if isinstance(duration, str) and duration != 'forever' and duration not in pids:
-                    logging.info(f'rule for pid {duration} expired: {action} {dst} {dst_port} {proto} {path} {args}')
-                    del state._rules[k]
-            time.sleep(1)
-        logging.error('trace gc exited prematurely')
-        sys.exit(1)
+def _gc():
+    while True:
+        pids = {pid for pid in os.listdir('/proc') if pid.isdigit()}
+        for k, (action, duration, start) in list(state._rules.items()):
+            dst, dst_port, proto, path, args = k
+            if isinstance(duration, int) and time.monotonic() - start > duration:
+                log(f'info: gc expired rule: {action} {dst} {dst_port} {proto} {path} {args}')
+                del state._rules[k]
+            if isinstance(duration, str) and duration != 'forever' and duration not in pids:
+                log(f'info: gc rule for pid {duration} expired: {action} {dst} {dst_port} {proto} {path} {args}')
+                del state._rules[k]
+        time.sleep(3)
+    log('fatal: rules gc exited prematurely')
+    sys.exit(1)
 
+def _process_queue():
+    while True:
+        finalize, conn, repeats = state._queue.get()
+        try:
+            # TODO instead of polling should we react to trace events?
+            if repeats < 100:
+                conn = opensnitch.trace.add_meta(*conn)
+                if repeats:
+                    log(f'debug: resolved meta after spinning {repeats} times for: {opensnitch.conn.format(*conn)}')
+            else:
+                log(f'debug: gave up trying to add meta to: {opensnitch.conn.format(*conn)}')
+        except KeyError:
+            state._delay_queue.put((finalize, conn, repeats + 1))
+        else:
+            opensnitch.rules.check(finalize, conn)
+    log('fatal: rules process-queue exited prematurely')
+    sys.exit(1)
+
+def _process_delay_queue():
+    while True:
+        time.sleep(.0001)
+        state._queue.put(state._delay_queue.get())
+    log('fatal: rules process-delay-queue exited prematurely')
+    sys.exit(1)
+
+def enqueue(finalize, conn):
+    repeats = 0
+    state._queue.put((finalize, conn, repeats))
 
 def _parse_rule(line):
     try:
         action, dst, dst_port, proto, path, args = line.split(None, 5)
     except ValueError:
-        logging.exception(f'invalid rule, should have been "action dst dst_port proto path args", was: {line}')
+        log(f'error: invalid rule, should have been "action dst dst_port proto path args", was: {line}')
+        traceback.print_exc()
         return
     try:
         if dst_port != '-':
             dst_port = int(dst_port)
     except ValueError:
-        logging.error(f'invalid rule: {line}')
-        logging.error(f'ports should be numbers, was: {dst_port}')
+        log(f'error: invalid rule: {line}')
+        log(f'error: ports should be numbers, was: {dst_port}')
         return
-    if proto not in opensnitch.conn.protos:
-        logging.error(f'invalid rule: {line}')
-        logging.error(f'bad proto, should be one of {opensnitch.conn.protos}, was: {proto}')
+    _protos = {'tcp', 'udp'}
+    if proto not in _protos:
+        log(f'error: invalid rule: {line}')
+        log(f'error: bad proto, should be one of {_protos}, was: {proto}')
         return
     if action not in _actions:
-        logging.error(f'invalid rule: {line}')
-        logging.error(f'bad action, should be one of {_actions}, was: {action}')
+        log(f'error: invalid rule: {line}')
+        log(f'error: bad action, should be one of {_actions}, was: {action}')
         return
     return action, dst, dst_port, proto, path, args
 
-def _persist_rule(k, v):
-    dst, dst_port, proto, path, args = k
-    action, _duration, _start = v
-    with open(_rules_file, 'a') as f:
-        f.write(f'{action} {dst} {dst_port} {proto} {path} {args}\n')
-
-def load_permanent_rules():
+def _load_permanent_rules():
     try:
         with open(_rules_file) as f:
             lines = reversed(f.read().splitlines()) # lines at top of file are higher priority
@@ -104,77 +124,70 @@ def load_permanent_rules():
         rule = _parse_rule(line)
         if rule:
             action, dst, dst_port, proto, path, args = rule
-            state._rules[(dst, dst_port, proto, path, args)] = action, None, None
+            duration = start = None
+            _add_rule(action, duration, start, dst, dst_port, proto, path, args)
     for i, ((dst, dst_port, proto, path, args), (action, _, _)) in enumerate(sorted(state._rules.items(), key=str)):
-        logging.info(f'loaded rule: {action} {dst} {dst_port} {proto} {path} {args}')
+        log(f'info: loaded rule: {action} {dst} {dst_port} {proto} {path} {args}')
         if i > 20:
-            logging.info('stopped logging rules...')
+            log('info: stopped logging rules...')
             break
     if list(lines):
-        logging.info(f'loaded {i + 1} rules from: {_rules_file}')
+        log(f'info: loaded {i + 1} rules from: {_rules_file}')
 
-def check(conn, prompt=True):
+def match_rule(_src, dst, _src_port, dst_port, proto, _pid, path, args):
+    # TODO something better than linear scan of rule variations
+    keys = [
+        (dst, dst_port, proto, path, args), # addr, port, path, args
+        (dst, dst_port, proto, path, '-'),  # addr, port, path
+        (dst, dst_port, proto, '-', '-'),   # addr, port
+        (dst, '-', proto, path, args),      # addr, path, args
+        (dst, '-', proto, path, '-'),       # addr, path
+        (dst, '-', proto, '-', '-'),        # addr
+    ]
+    for k in keys:
+        try:
+            return state._rules[k]
+        except KeyError:
+            pass
+
+def check(finalize, conn):
     conn = opensnitch.dns.resolve(conn)
-    src, dst, _src_port, dst_port, proto, pid, path, args = conn
-    try:
-        keys = [
-            (dst, dst_port, proto, path, args),
-            (dst, dst_port, proto, path, '-'),
-            (dst, '-', proto, path, args),
-            (dst, '-', proto, path, '-'),
-        ]
-        for k in keys:
-            try:
-                rule = state._rules[k]
-                break
-            except KeyError:
-                pass
-        else:
-            raise KeyError
-    except KeyError:
-        if not prompt:
-            return
-        if state.prompts.get(conn) is not None:
-            return state.prompts.pop(conn)
-        elif state.prompts:
-            state.waiting[conn] = time.monotonic()
-            now = time.monotonic()
-            if now - state._last_sleep['seconds'] > .001:
-                state._last_sleep['seconds'] = now
-                time.sleep(.001)
-                if random.random() > .99:
-                    logging.info(f"spinning {int(time.time())}\n{state.prompts}\n {conn}")
-            return opensnitch.rules.REPEAT
-        else:
-            state.waiting.pop(conn, None)
-            state.prompts[conn] = None
-            opensnitch.lib.run_thread(_prompt, pid, conn)
-            return opensnitch.rules.REPEAT
-    else:
+    rule = match_rule(*conn)
+    if rule:
         action, _duration, _start = rule
-        if action == 'yes':
-            return ALLOW
-        elif action == 'no':
-            return DENY
-        assert False
-
-def _prompt(pid, conn):
-    try:
-        duration, scope, action, granularity = opensnitch.lib.check_output(f'DISPLAY=:0 opensnitch-prompt "{opensnitch.conn.format(conn)}" 2>/dev/null').split()
-    except:
-        logging.error('failed run opensnitch-prompt')
-        action = opensnitch.rules.DENY
+        finalize(action, conn)
     else:
-        action = _process_rule(pid, conn, duration, scope, action, granularity)
-    state.prompts[conn] = action
+        state._prompt_queue.put((finalize, conn))
 
-def _process_rule(pid, conn, duration, scope, action, granularity):
-    src, dst, _src_port, dst_port, proto, pid, path, args = conn
+def _process_prompt_queue():
+    while True:
+        finalize, conn = state._prompt_queue.get()
+        if not opensnitch.trace.is_alive(*conn):
+            finalize('deny', conn)
+        else:
+            rule = match_rule(*conn)
+            if rule:
+                action, _duration, _start = rule
+                finalize(action, conn)
+            else:
+                try:
+                    duration, scope, action, granularity = opensnitch.lib.check_output(f'DISPLAY=:0 opensnitch-prompt "{opensnitch.conn.format(*conn)}" 2>/dev/null').split()
+                except:
+                    log('error: failed run opensnitch-prompt')
+                    finalize('deny', conn)
+                else:
+                    action = _process_rule(conn, duration, scope, action, granularity)
+                    finalize(action, conn)
+    log('fatal: process-prompt-queue exited prematurely')
+    sys.exit(1)
+
+def _process_rule(conn, duration, scope, action, granularity):
+    _src, dst, _src_port, dst_port, proto, pid, path, args = conn
     if granularity == 'just-path':
         args = '-'
     args = args or '-'
     if duration == 'once':
-        return ALLOW if action == 'yes' else DENY
+        return action
     else:
         _duration = duration
         if duration == 'until-quit':
@@ -186,12 +199,19 @@ def _process_rule(pid, conn, duration, scope, action, granularity):
             duration = None
         if scope == 'domain':
             dst_port = '-'
-        k = dst, dst_port, proto, path, args
-        v = action, duration, time.monotonic()
-        state._rules[k] = v
+        start = time.monotonic()
+        _add_rule(action, duration, start, dst, dst_port, proto, path, args)
         if duration is None:
-            _persist_rule(k, v)
-            logging.info(f'add permanent rule: {action} {dst} {dst_port} {proto} {path} {args}')
+            with open(_rules_file, 'a') as f:
+                f.write(f'{action} {dst} {dst_port} {proto} {path} {args}\n')
+            log(f'info: add permanent rule: {action} {dst} {dst_port} {proto} {path} {args}')
         else:
-            logging.info(f'add temporary rule: {action} {_duration} {dst} {dst_port} {proto} {path} {args}')
-        return check(conn)
+            log(f'info: add temporary rule: {action} {_duration} {dst} {dst_port} {proto} {path} {args}')
+        return action
+
+def start():
+    _load_permanent_rules()
+    opensnitch.lib.run_thread(_gc)
+    opensnitch.lib.run_thread(_process_queue)
+    opensnitch.lib.run_thread(_process_delay_queue)
+    opensnitch.lib.run_thread(_process_prompt_queue)

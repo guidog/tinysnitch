@@ -18,144 +18,83 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
 import time
-import logging
-import sys
 import opensnitch.lib
 import subprocess
+import sys
 import threading
+import time
+import queue
+from opensnitch.lib import log
 
 class state:
-    lock = threading.RLock()
-    pids_ttl = 5
-    filenames_ttl = 5
-    pids = {}
-    reverse_pids = set()
-    exits = {}
-    filenames = {}
+    _lock = threading.RLock()
+    _pids = {} # {pid: (path, args)}
+    _conns = {} # {(src, src_port, dst, dst_port): (pid, time)}
+    _cleanup_queue = queue.Queue(1024 * 1024)
 
-    def get_filename(pid):
-        path, args = opensnitch.trace.state.filenames[pid]
-        return path, args
+def _cb_execve(pid, path, *args):
+    state._pids[pid] = path, ' '.join(args)
 
-    def add_filename(pid, path, args):
-        state.filenames[pid] = path, args
+def _cb_tcp_udp(pid, src, src_port, dst, dst_port):
+    k = src, int(src_port), dst, int(dst_port)
+    start = time.monotonic()
+    state._conns[k] = pid, start
 
-    def get_pid(src, src_port, dst, dst_port):
-        k = src, src_port, dst, dst_port
-        pid, _start = state.pids[k]
-        return pid
+def _cb_exit(pid):
+    state._pids.pop(pid, None)
 
-    def add_pid(pid, src, src_port, dst, dst_port):
-        src_port, dst_port = int(src_port), int(dst_port)
-        start = time.monotonic()
-        k1 = src, src_port, dst, dst_port
-        k2 = dst, dst_port, src, src_port
-        with state.lock:
-            state.pids[k1] = pid, start
-            state.pids[k2] = pid, start
-            state.reverse_pids.add(pid)
+def _cb_fork(pid, child_pid):
+    with state._lock:
+        if pid in state._pids:
+            state._pids[child_pid] = state._pids[pid]
 
-    def gc():
-        while True:
-            now = time.monotonic()
-            pids_inflight = opensnitch.rules.state.pids_inflight()
-            for k, (pid, start) in list(state.pids.items()):
-                if now - start > state.pids_ttl and pid not in pids_inflight:
-                    logging.info(f'gc stale pid: {k}')
-                    with state.lock:
-                        del state.pids[k]
-                        state.reverse_pids.discard(pid)
-            for pid, start in list(state.exits.items()):
-                if now - start > state.filenames_ttl and pid not in pids_inflight:
-                    logging.info(f'gc exited pid: {state.filenames[pid]}')
-                    with state.lock:
-                        del state.exits[pid]
-                        del state.filenames[pid]
-            time.sleep(1)
-        logging.error('trace gc exited prematurely')
-        sys.exit(1)
+def rm_conn(src, dst, src_port, dst_port, _proto, _pid, _path, _args):
+    state._cleanup_queue.put((src, src_port, dst, dst_port, time.monotonic()))
 
-def _tail_execve(proc):
+def _gc():
+    grace_seconds = 5 # TODO ideal value?
     while True:
-        try:
-            line = proc.stdout.readline().rstrip().decode('utf-8')
-        except UnicodeDecodeError:
-            logging.error(f'failed to utf-8 decode bpftrace execve line: {[line]}')
-        else:
-            if not line:
-                break
-            try:
-                pid, path, *args = line.split()
-            except ValueError:
-                logging.debug(f'bad execve line: {[line]}')
+        now = time.monotonic()
+        for _ in range(state._cleanup_queue.qsize()):
+            src, src_port, dst, dst_port, start = state._cleanup_queue.get()
+            if now - start > grace_seconds: # sometimes dns request reuse the same port, so a grace period before cleanup
+                state._conns.pop((src, src_port, dst, dst_port), None)
             else:
-                state.add_filename(pid, path, ' '.join(args))
-    logging.error('tail execve exited prematurely')
+                state._cleanup_queue.put((src, src_port, dst, dst_port, start))
+        time.sleep(2)
+    log('error: trace gc exited prematurely')
     sys.exit(1)
 
-def _tail_tcp_udp(proc):
-    proc.stdout.readline()
-    while True:
-        try:
-            line = proc.stdout.readline().rstrip().decode('utf-8')
-        except UnicodeDecodeError:
-            logging.error(f'failed to utf-8 decode bpftrace tcp/udp line: {[line]}')
-        else:
-            if not line:
-                break
-            try:
-                pid, _comm, src, src_port, dst, dst_port = line.split()
-            except ValueError:
-                logging.error(f'bad tcp/udp line: {[line]}')
-            else:
-                state.add_pid(pid, src, src_port, dst, dst_port)
-    logging.error('tail tcp/udp exited prematurely')
-    sys.exit(1)
+_protos = {'tcp', 'udp'}
 
-def _tail_exit(proc):
-    proc.stdout.readline()
-    while True:
-        try:
-            line = proc.stdout.readline().rstrip().decode('utf-8')
-        except UnicodeDecodeError:
-            logging.error(f'failed to utf-8 decode bpftrace exit line: {[line]}')
-        else:
-            if not line:
-                break
-            try:
-                pid, path = line.split()
-            except ValueError:
-                logging.error(f'bad exit line: {[line]}')
-            else:
-                with state.lock:
-                    if pid in state.reverse_pids:
-                        logging.info(f'exited: {state.filenames[pid]}')
-                        state.exits[pid] = time.monotonic()
-    logging.error('tail exit exited prematurely')
-    sys.exit(1)
+def is_alive(_src, _dst, _src_port, _dst_port, _proto, pid, _path, _args):
+    return pid in state._pids
 
-def _tail_fork(proc):
-    proc.stdout.readline()
+def add_meta(src, dst, src_port, dst_port, proto, _pid, _path, _args):
+    # TODO add meta for the server pid on incoming connections. tcp can be seen
+    # via opensnitch-bpftrace-tcp-accept, udp can be seen via
+    # opensnitch-bpftrace-udp with source and dest address as 0.0.0.0
+    if proto in _protos:
+        with opensnitch.trace.state._lock:
+            pid, _ = state._conns[(src, src_port, dst, dst_port)]
+            path, args = state._pids[pid]
+    return src, dst, src_port, dst_port, proto, pid, path, args
+
+def _tail(name, proc, callback):
+    log(f'info: start tailing: {name}')
     while True:
         try:
             line = proc.stdout.readline().rstrip().decode('utf-8')
         except UnicodeDecodeError:
-            logging.error(f'failed to utf-8 decode bpftrace fork line: {[line]}')
+            log(f'warn: failed to utf-8 decode {name} line: {[line]}')
         else:
             if not line:
                 break
             try:
-                pid, child_pid, comm = line.split()
-            except ValueError:
-                logging.error(f'bad fork line: {[line]}')
-            else:
-                try:
-                    with state.lock:
-                        path, args = state.get_filename(pid)
-                        state.add_filename(pid, path, args)
-                except KeyError:
-                    pass
-    logging.error('tail fork exited prematurely')
+                callback(*line.split())
+            except TypeError:
+                log(f'warn: bad {name} line: {[line]}')
+    log(f'fatal: tail {name} exited prematurely')
     sys.exit(1)
 
 def _load_existing_pids():
@@ -164,30 +103,27 @@ def _load_existing_pids():
     xs = ((pid, path) for uid, pid, ppid, c, stime, tty, time, path in xs)
     xs = ((pid, path) for pid, path in xs if not path.startswith('['))
     for pid, path in xs:
-        try:
-            path, args = path.split(None, 1)
-        except ValueError:
-            args = ''
+        path, *args = path.split()
         if '/' not in path:
             try:
                 path = opensnitch.lib.check_output(f'sudo ls -l /proc/{pid}/exe 2>/dev/null').split(' -> ')[-1]
             except subprocess.CalledProcessError:
                 pass
-        state.add_filename(pid, path, args)
+        _cb_execve(pid, path, *args)
+
 
 pairs = [
-    ('opensnitch-bpftrace-tcp', _tail_tcp_udp),
-    ('opensnitch-bpftrace-udp', _tail_tcp_udp),
-    ('opensnitch-bpftrace-fork', _tail_fork),
-    ('opensnitch-bpftrace-exit', _tail_exit),
-    ('opensnitch-bcc-execve', _tail_execve),
+    ('opensnitch-bpftrace-tcp', _cb_tcp_udp),
+    ('opensnitch-bpftrace-udp', _cb_tcp_udp),
+    ('opensnitch-bpftrace-fork', _cb_fork),
+    ('opensnitch-bpftrace-exit', _cb_exit),
+    ('opensnitch-bcc-execve', _cb_execve),
 ]
 
 def start():
     _load_existing_pids()
-    # opensnitch.lib.run_thread(state.gc)
-    for program, tail in pairs:
-        proc = subprocess.Popen(['stdbuf', '-oL', program], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    opensnitch.lib.run_thread(_gc)
+    for program, cb in pairs:
+        proc = subprocess.Popen(['stdbuf', '-o0', program], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         opensnitch.lib.run_thread(opensnitch.lib.monitor, proc)
-        opensnitch.lib.run_thread(tail, proc)
-        logging.info(f'started trace: {program}')
+        opensnitch.lib.run_thread(_tail, program, proc, cb)

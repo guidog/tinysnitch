@@ -77,6 +77,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def exit(self):
         self.update()
+        self.action = {'yes': 'allow', 'no': 'deny'}[self.action]
         print(f'{self.duration} {self.scope} {self.action} {self.granularity}')
         sys.exit(0)
 

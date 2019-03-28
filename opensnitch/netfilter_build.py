@@ -28,7 +28,7 @@ ffibuilder = FFI()
 
 ffibuilder.cdef(r"""
 
-extern "Python" int _py_callback(unsigned char* data, unsigned int len);
+extern "Python" void _py_callback(unsigned int id, unsigned char* data, unsigned int len);
 static inline struct nfq_q_handle* create_queue(struct nfq_handle *h, unsigned int queue, unsigned int idx);
 static inline int run(struct nfq_handle *h, int fd);
 struct nfq_handle * nfq_open (void);
@@ -41,13 +41,15 @@ int nfq_set_queue_maxlen (struct nfq_q_handle *qh, uint32_t queuelen);
 int nfq_set_mode (struct nfq_q_handle *qh, uint8_t mode, uint32_t range);
 int nfq_fd (struct nfq_handle *h);
 int nfq_destroy_queue (struct nfq_q_handle *qh);
-
+int nfq_set_verdict (struct nfq_q_handle *qh, uint32_t id, uint32_t verdict, uint32_t data_len, const unsigned char *buf);
+int nfq_set_verdict2 (struct nfq_q_handle *qh, uint32_t id, uint32_t verdict, uint32_t mark, uint32_t data_len, const unsigned char *buf);
 """)
 
 ffibuilder.set_source(
     "_netfilter",
     r"""
 
+#include <assert.h>
 #include <errno.h>
 #include <netinet/in.h>
 #include <libnetfilter_queue/libnetfilter_queue.h>
@@ -56,20 +58,14 @@ ffibuilder.set_source(
 #define NF_ACCEPT 1
 #define NF_REPEAT 4
 
-static int _py_callback(unsigned char* data, unsigned int len);
+static void _py_callback(unsigned int id, unsigned char* data, unsigned int len);
 
 static int nf_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *arg) {
     unsigned char *buffer = NULL;
     struct nfqnl_msg_packet_hdr *ph = nfq_get_msg_packet_hdr(nfa);
     unsigned int id = ntohl(ph->packet_id);
     unsigned int size = nfq_get_payload(nfa, &buffer);
-    int response = _py_callback(buffer, size);
-    if (response == 0)
-        return nfq_set_verdict2(qh, id, NF_ACCEPT, NF_MARK, size, buffer);
-    else if (response == 1)
-        return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
-    else if (response == 2)
-        return nfq_set_verdict(qh, id, NF_REPEAT, 0, NULL);
+    _py_callback(id, buffer, size);
 }
 
 static inline struct nfq_q_handle* create_queue(struct nfq_handle *h, unsigned int queue, unsigned int idx) {

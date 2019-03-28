@@ -32,21 +32,23 @@ except ModuleNotFoundError:
     os.chdir(orig)
     from opensnitch._netfilter import ffi, lib
 
-import collections
-import logging
 import opensnitch.conn
 import opensnitch.dns
 import opensnitch.rules
+import opensnitch.trace
 import opensnitch.lib
 import scapy.layers.inet
-import sys
 import time
-import time
-import xxhash
+from opensnitch.lib import log
 
-_repeats = collections.defaultdict(int)
-_repeats_start = {}
-_repeats_ttl = 5
+class state:
+    _nfq_q_handle = None
+
+
+NULL = ffi.NULL
+ZERO = DENY = ffi.cast('int', 0)
+ONE = ffi.cast('int', 1)
+MARK = ffi.cast('int', 101285)
 
 _AF_INET = ffi.cast('int', 2)
 _AF_INET6 = ffi.cast('int', 10)
@@ -54,15 +56,15 @@ _NF_DEFAULT_QUEUE_SIZE = ffi.cast('unsigned int', 4096)
 _NF_DEFAULT_PACKET_SIZE = ffi.cast('unsigned int', 4096)
 _DEFAULT_TOTAL_SIZE = ffi.cast('unsigned int', 4096 * 4096)
 
-def create(queue_num):
-    queue_num = ffi.cast('unsigned int', queue_num)
+def create():
+    queue_num = ffi.cast('unsigned int', 0)
     queue_id = ffi.cast('unsigned int', time.time())
     nfq_handle = lib.nfq_open()
     assert lib.nfq_unbind_pf(nfq_handle, _AF_INET) >= 0
     assert lib.nfq_unbind_pf(nfq_handle, _AF_INET6) >= 0
     assert lib.nfq_bind_pf(nfq_handle, _AF_INET) >= 0
     assert lib.nfq_bind_pf(nfq_handle, _AF_INET6) >= 0
-    nfq_q_handle = lib.create_queue(nfq_handle, queue_num, queue_id)
+    state._nfq_q_handle = nfq_q_handle = lib.create_queue(nfq_handle, queue_num, queue_id)
     return nfq_handle, nfq_q_handle
 
 def setup(nfq_handle, nfq_q_handle):
@@ -73,7 +75,6 @@ def setup(nfq_handle, nfq_q_handle):
     return nfq_fd
 
 def run(nfq_handle, nfq_fd):
-    # opensnitch.lib.run_thread(_gc)
     assert lib.run(nfq_handle, nfq_fd) == 0
 
 def destroy(nfq_q_handle, nfq_handle):
@@ -82,44 +83,41 @@ def destroy(nfq_q_handle, nfq_handle):
     if nfq_handle:
         assert lib.nfq_close(nfq_handle) == 0
 
-def _gc():
-    while True:
-        now = time.monotonic()
-        for checksum, start in list(_repeats_start.items()):
-            if now - start > _repeats_ttl:
-                del _repeats[checksum]
-                del _repeats_start[checksum]
-        time.sleep(1)
-    logging.error('netfilter gc exited prematurely')
-    sys.exit(1)
+def _finalize(nfq, id, data, size, orig_conn, action, conn):
+    if not opensnitch.dns.is_inbound_dns(*conn):
+        log(f'info: {action}: {opensnitch.conn.format(*conn)}')
+    if action == 'allow':
+        lib.nfq_set_verdict(nfq, id, ONE, ZERO, NULL)
+    elif action == 'deny':
+        lib.nfq_set_verdict2(nfq, id, ONE, MARK, size, data)
+    else:
+        assert False, f'bad action: {action}'
+    opensnitch.trace.rm_conn(*orig_conn)
 
 @ffi.def_extern()
-def _py_callback(data, length):
-    unpacked = bytes(ffi.unpack(data, length))
+def _py_callback(id, data, size):
+    unpacked = bytes(ffi.unpack(data, size))
     packet = scapy.layers.inet.IP(unpacked)
     opensnitch.dns.update_hosts(packet)
     conn = opensnitch.conn.parse(packet)
-    try:
-        conn = opensnitch.conn.add_meta(conn)
-        src, dst, src_port, dst_port, proto, pid, path, args = conn
-    except KeyError:
-        src, dst, src_port, dst_port, proto, pid, path, args = conn
-        action = opensnitch.rules.check(conn, prompt=False)
-        if action:
-            return action
-        checksum = xxhash.xxh64_hexdigest(unpacked) # TODO update to xx3hash
-        _repeats_start[checksum] = time.monotonic()
-        _repeats[checksum] += 1
-        if _repeats[checksum] > 1000: # give trace.py a chance to catch up, otherwise you are missing pid/path/args data
-            action = opensnitch.rules.check(conn)
-        else:
-            action = opensnitch.rules.REPEAT
+    finalize = lambda action, new_conn: _finalize(state._nfq_q_handle, id, data, size, conn, action, new_conn)
+
+    # the fastest rule types dont require pid/path/args
+    rule = opensnitch.rules.match_rule(*conn)
+    if rule:
+        action, _duration, _start = rule
+        finalize(action, conn)
+
+    # auto allow and dont double print dns packets, the only ones we track after --ctstate NEW, so that we can log the solved addr
+    elif opensnitch.dns.is_inbound_dns(*conn):
+        finalize('allow', conn)
+
     else:
-        if dst in opensnitch.dns.state.localhosts and src_port == 53: # auto allow and dont double print dns packets, the only ones we track after --ctstate NEW, so that we can log the solved addr
-            return opensnitch.rules.ALLOW
-        action = opensnitch.rules.check(conn)
-    if action is opensnitch.rules.ALLOW:
-        logging.info(f'allow: {opensnitch.conn.format(conn)}')
-    elif action is opensnitch.rules.DENY:
-        logging.info(f'deny: {opensnitch.conn.format(conn)}')
-    return action
+        # make an attempt to add meta and process inline
+        try:
+            conn = opensnitch.trace.add_meta(*conn)
+            opensnitch.rules.check(finalize, conn)
+
+        # otherwise enqueue for delayed processing
+        except KeyError:
+            opensnitch.rules.enqueue(finalize, conn)
