@@ -17,9 +17,13 @@
 # or write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
+from opensnitch.lib import log
+
 try:
     from opensnitch._netfilter import ffi, lib
+    log('use existing ffi binaries')
 except ModuleNotFoundError:
+    log('recompile ffi binaries')
     import opensnitch.netfilter_build
     import os
     orig = os.getcwd()
@@ -32,18 +36,15 @@ except ModuleNotFoundError:
     os.chdir(orig)
     from opensnitch._netfilter import ffi, lib
 
-import opensnitch.conn
 import opensnitch.dns
+import opensnitch.lib
 import opensnitch.rules
 import opensnitch.trace
-import opensnitch.lib
 import scapy.layers.inet
 import time
-from opensnitch.lib import log
 
 class state:
     _nfq_q_handle = None
-
 
 NULL = ffi.NULL
 ZERO = DENY = ffi.cast('int', 0)
@@ -85,7 +86,7 @@ def destroy(nfq_q_handle, nfq_handle):
 
 def _finalize(nfq, id, data, size, orig_conn, action, conn):
     if not opensnitch.dns.is_inbound_dns(*conn):
-        log(f'info: {action}: {opensnitch.conn.format(*conn)}')
+        log(f'info: {action}: {opensnitch.dns.format(*conn)}')
     if action == 'allow':
         lib.nfq_set_verdict(nfq, id, ONE, ZERO, NULL)
     elif action == 'deny':
@@ -99,7 +100,7 @@ def _py_callback(id, data, size):
     unpacked = bytes(ffi.unpack(data, size))
     packet = scapy.layers.inet.IP(unpacked)
     opensnitch.dns.update_hosts(packet)
-    conn = opensnitch.conn.parse(packet)
+    conn = opensnitch.lib.conn(packet)
     finalize = lambda action, new_conn: _finalize(state._nfq_q_handle, id, data, size, conn, action, new_conn)
 
     # the fastest rule types dont require pid/path/args

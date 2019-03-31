@@ -32,6 +32,35 @@ class state:
     _conns = {} # {(src, src_port, dst, dst_port): (pid, time)}
     _cleanup_queue = queue.Queue(1024 * 1024)
 
+def start():
+    _load_existing_pids()
+    opensnitch.lib.run_thread(_gc)
+    _pairs = [('opensnitch-bpftrace-tcp', _cb_tcp_udp),
+              ('opensnitch-bpftrace-udp', _cb_tcp_udp),
+              ('opensnitch-bpftrace-fork', _cb_fork),
+              ('opensnitch-bpftrace-exit', _cb_exit),
+              ('opensnitch-bcc-execve', _cb_execve)]
+    for program, cb in _pairs:
+        proc = subprocess.Popen(['stdbuf', '-o0', program], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        opensnitch.lib.run_thread(opensnitch.lib.monitor, proc)
+        opensnitch.lib.run_thread(_tail, program, proc, cb)
+
+def rm_conn(src, dst, src_port, dst_port, _proto, _pid, _path, _args):
+    state._cleanup_queue.put((src, src_port, dst, dst_port, time.monotonic()))
+
+def is_alive(_src, _dst, _src_port, _dst_port, _proto, pid, _path, _args):
+    return pid in state._pids
+
+def add_meta(src, dst, src_port, dst_port, proto, _pid, _path, _args):
+    # TODO add meta for the server pid on incoming connections. tcp can be seen
+    # via opensnitch-bpftrace-tcp-accept, udp can be seen via
+    # opensnitch-bpftrace-udp with source and dest address as 0.0.0.0
+    if proto in opensnitch.lib.protos:
+        with state._lock:
+            pid, _ = state._conns[(src, src_port, dst, dst_port)]
+            path, args = state._pids[pid]
+    return src, dst, src_port, dst_port, proto, pid, path, args
+
 def _cb_execve(pid, path, *args):
     state._pids[pid] = path, ' '.join(args)
 
@@ -48,9 +77,6 @@ def _cb_fork(pid, child_pid):
         if pid in state._pids:
             state._pids[child_pid] = state._pids[pid]
 
-def rm_conn(src, dst, src_port, dst_port, _proto, _pid, _path, _args):
-    state._cleanup_queue.put((src, src_port, dst, dst_port, time.monotonic()))
-
 def _gc():
     grace_seconds = 5 # TODO ideal value?
     while True:
@@ -61,24 +87,9 @@ def _gc():
                 state._conns.pop((src, src_port, dst, dst_port), None)
             else:
                 state._cleanup_queue.put((src, src_port, dst, dst_port, start))
-        time.sleep(2)
+        time.sleep(grace_seconds)
     log('error: trace gc exited prematurely')
     sys.exit(1)
-
-_protos = {'tcp', 'udp'}
-
-def is_alive(_src, _dst, _src_port, _dst_port, _proto, pid, _path, _args):
-    return pid in state._pids
-
-def add_meta(src, dst, src_port, dst_port, proto, _pid, _path, _args):
-    # TODO add meta for the server pid on incoming connections. tcp can be seen
-    # via opensnitch-bpftrace-tcp-accept, udp can be seen via
-    # opensnitch-bpftrace-udp with source and dest address as 0.0.0.0
-    if proto in _protos:
-        with opensnitch.trace.state._lock:
-            pid, _ = state._conns[(src, src_port, dst, dst_port)]
-            path, args = state._pids[pid]
-    return src, dst, src_port, dst_port, proto, pid, path, args
 
 def _tail(name, proc, callback):
     log(f'info: start tailing: {name}')
@@ -93,7 +104,7 @@ def _tail(name, proc, callback):
             try:
                 callback(*line.split())
             except TypeError:
-                log(f'warn: bad {name} line: {[line]}')
+                pass # log(f'warn: bad {name} line: {[line]}')
     log(f'fatal: tail {name} exited prematurely')
     sys.exit(1)
 
@@ -110,20 +121,3 @@ def _load_existing_pids():
             except subprocess.CalledProcessError:
                 pass
         _cb_execve(pid, path, *args)
-
-
-pairs = [
-    ('opensnitch-bpftrace-tcp', _cb_tcp_udp),
-    ('opensnitch-bpftrace-udp', _cb_tcp_udp),
-    ('opensnitch-bpftrace-fork', _cb_fork),
-    ('opensnitch-bpftrace-exit', _cb_exit),
-    ('opensnitch-bcc-execve', _cb_execve),
-]
-
-def start():
-    _load_existing_pids()
-    opensnitch.lib.run_thread(_gc)
-    for program, cb in pairs:
-        proc = subprocess.Popen(['stdbuf', '-o0', program], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        opensnitch.lib.run_thread(opensnitch.lib.monitor, proc)
-        opensnitch.lib.run_thread(_tail, program, proc, cb)

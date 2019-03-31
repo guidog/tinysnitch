@@ -35,16 +35,36 @@ class state:
     _hosts = {}
     _new_addrs = []
 
+def start():
+    _populate_localhosts()
+    _populate_hosts()
+    opensnitch.lib.run_thread(_persister)
+
+def format(src, dst, src_port, dst_port, proto, pid, path, args):
+    if opensnitch.dns.is_localhost(dst):
+        return f'{proto} | {dst}:{dst_port} <- {src}:{src_port} | {pid} {path} | {args}'
+    else:
+        return f'{proto} | {src}:{src_port} -> {dst}:{dst_port} | {pid} {path} | {args}'
+
 def is_inbound_dns(src, dst, src_port, dst_port, proto, pid, path, args):
     return is_localhost(dst) and src_port == 53
 
 def is_localhost(addr):
     return addr in state._localhosts
 
-def start():
-    _populate_localhosts()
-    _populate_hosts()
-    opensnitch.lib.run_thread(_persister)
+def update_hosts(packet):
+    if UDP in packet and DNS in packet:
+        addrs = []
+        for name, addr in _parse_dns(packet):
+            if addr:
+                state._hosts[addr] = name
+                addrs.append(addr)
+                state._new_addrs.append(addr)
+        if addrs:
+            log(f'info: dns: {name} {" ".join(addrs)}')
+
+def resolve(src, dst, src_port, dst_port, proto, pid, path, args):
+    return _get_hostname(src), _get_hostname(dst), src_port, dst_port, proto, pid, path, args
 
 def _populate_hosts():
     try:
@@ -73,17 +93,6 @@ def _parse_dns(packet):
             dnsrr = dns.an[i]
             yield opensnitch.lib.decode(dnsrr.rrname), opensnitch.lib.decode(dnsrr.rdata)
 
-def update_hosts(packet):
-    if UDP in packet and DNS in packet:
-        addrs = []
-        for name, addr in _parse_dns(packet):
-            if addr:
-                state._hosts[addr] = name
-                addrs.append(addr)
-                state._new_addrs.append(addr)
-        if addrs:
-            log(f'info: dns: {name} {" ".join(addrs)}')
-
 def _get_hostname(address):
     return state._hosts.get(address, address)
 
@@ -100,10 +109,3 @@ def _persister():
         time.sleep(1)
     log('fatal: dns persister exited prematurely')
     sys.exit(1)
-
-def resolve(conn):
-    src, dst, src_port, dst_port, proto, pid, path, args = conn
-    src = _get_hostname(src)
-    dst = _get_hostname(dst)
-    conn = src, dst, src_port, dst_port, proto, pid, path, args
-    return conn

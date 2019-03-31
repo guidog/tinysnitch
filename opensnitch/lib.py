@@ -26,6 +26,19 @@ import signal
 import sys
 import time
 
+protos = {'tcp', 'udp'}
+
+def conn(packet):
+    src = packet.src
+    dst = packet.dst
+    src_port = dst_port = proto = pid = path = args = '-'
+    proto = packet.get_field('proto').i2s[packet.proto]
+    if proto in protos:
+        ip = packet['IP']
+        src_port = ip.sport
+        dst_port = ip.dport
+    return src, dst, src_port, dst_port, proto, pid, path, args
+
 def log(x):
     print(x)
 
