@@ -88,24 +88,24 @@ def _gc():
             else:
                 state._cleanup_queue.put((src, src_port, dst, dst_port, start))
         time.sleep(grace_seconds)
-    log('error: trace gc exited prematurely')
+    log('ERROR trace gc exited prematurely')
     sys.exit(1)
 
 def _tail(name, proc, callback):
-    log(f'info: start tailing: {name}')
+    log(f'INFO start tailing {name}')
     while True:
         try:
             line = proc.stdout.readline().rstrip().decode('utf-8')
         except UnicodeDecodeError:
-            log(f'warn: failed to utf-8 decode {name} line: {[line]}')
+            log(f'WARN failed to utf-8 decode {name} line {[line]}')
         else:
             if not line:
                 break
             try:
                 callback(*line.split())
             except TypeError:
-                pass # log(f'warn: bad {name} line: {[line]}')
-    log(f'fatal: tail {name} exited prematurely')
+                pass # log(f'WARN bad {name} line {[line]}')
+    log(f'FATAL tail {name} exited prematurely')
     sys.exit(1)
 
 def _load_existing_pids():

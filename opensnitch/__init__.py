@@ -41,9 +41,9 @@ def _log_sizes():
     while True:
         states = [opensnitch.dns.state, opensnitch.trace.state, opensnitch.rules.state, opensnitch.netfilter.state]
         sizes = [f'{state.__module__.split(".")[-1]}.{opensnitch.lib.yellow(k)}:{len(v)}' for state in states for k, v in state.__dict__.items() if isinstance(v, dict)]
-        log(f"info: sizes: {' '.join(sizes)}")
+        log(f"INFO sizes {' '.join(sizes)}")
         time.sleep(2)
-    log('fatal: log sizes exited prematurely')
+    log('FATAL log sizes exited prematurely')
     sys.exit(1)
 
 def main(setup_firewall=False, teardown_firewall=False, log_sizes=False):

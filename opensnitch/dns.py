@@ -61,7 +61,7 @@ def update_hosts(packet):
                 addrs.append(addr)
                 state._new_addrs.append(addr)
         if addrs:
-            log(f'info: dns: {name} {" ".join(addrs)}')
+            log(f'INFO dns {name} {" ".join(addrs)}')
 
 def resolve(src, dst, src_port, dst_port, proto, pid, path, args):
     return _get_hostname(src), _get_hostname(dst), src_port, dst_port, proto, pid, path, args
@@ -107,5 +107,5 @@ def _persister():
                 else:
                     f.write(f'{addr} {state._hosts[addr]}\n')
         time.sleep(1)
-    log('fatal: dns persister exited prematurely')
+    log('FATAL dns persister exited prematurely')
     sys.exit(1)

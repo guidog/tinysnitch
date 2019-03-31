@@ -69,10 +69,10 @@ def exceptions_kill_parent(decoratee):
 def monitor(proc):
     while True:
         if proc.poll() is not None:
-            log('error: bpftrace exited prematurely')
+            log('ERROR bpftrace exited prematurely')
             sys.exit(1)
         time.sleep(1)
-    log('error: monitor exited prematurely')
+    log('ERROR monitor exited prematurely')
     sys.exit(1)
 
 def decode(x):
