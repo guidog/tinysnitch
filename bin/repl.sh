@@ -44,7 +44,7 @@ def restart():
         restart.proc.terminate()
     cc('find -type f | grep -E \"\.c$|\.o$|\.so$\" | xargs rm -fv')
     kill_children()
-    restart.proc = subprocess.Popen('pypy-ipython -ic \'from opensnitch import rules, trace, dns, conn; import opensnitch, threading; t = threading.Thread(target=opensnitch.main); t.daemon = True; t.start()\'', shell=True)
+    restart.proc = subprocess.Popen('pypy-ipython -ic \'from opensnitch import rules, trace, dns; import opensnitch, threading; t = threading.Thread(target=opensnitch.main); t.daemon = True; t.start()\'', shell=True)
 
 import atexit
 @atexit.register
