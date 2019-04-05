@@ -81,6 +81,7 @@ def _populate_localhosts():
     for line in opensnitch.lib.check_output('ip a | grep inet').splitlines() + ['- localhost -']:
         _, addr, *_ = line.strip().split()
         addr = addr.split('/')[0]
+        state._hosts[addr] = 'localhost'
         state._localhosts.add(addr)
 
 def _parse_dns(packet):
