@@ -49,12 +49,14 @@ def rm_conn(src, dst, src_port, dst_port, _proto, _pid, _path, _args):
     state._cleanup_queue.put((src, src_port, dst, dst_port, time.monotonic()))
 
 def is_alive(_src, _dst, _src_port, _dst_port, _proto, pid, _path, _args):
-    return pid in state._pids
+    return pid == '-' or pid in state._pids
 
 def add_meta(src, dst, src_port, dst_port, proto, _pid, _path, _args):
+
     # TODO add meta for the server pid on incoming connections. tcp can be seen
     # via opensnitch-bpftrace-tcp-accept, udp can be seen via
     # opensnitch-bpftrace-udp with source and dest address as 0.0.0.0
+
     if proto in opensnitch.lib.protos:
         with state._lock:
             pid, _ = state._conns[(src, src_port, dst, dst_port)]
@@ -104,7 +106,8 @@ def _tail(name, proc, callback):
             try:
                 callback(*line.split())
             except TypeError:
-                pass # log(f'WARN bad {name} line {[line]}')
+                # log(f'WARN bad {name} line {[line]}')
+                pass
     log(f'FATAL tail {name} exited prematurely')
     sys.exit(1)
 
