@@ -64,7 +64,7 @@ def update_hosts(packet):
             log(f'INFO dns {name} {" ".join(addrs)}')
 
 def resolve(src, dst, src_port, dst_port, proto, pid, path, args):
-    return _get_hostname(src), _get_hostname(dst), src_port, dst_port, proto, pid, path, args
+    return get_hostname(src), get_hostname(dst), src_port, dst_port, proto, pid, path, args
 
 def _populate_hosts():
     try:
@@ -94,7 +94,7 @@ def _parse_dns(packet):
             dnsrr = dns.an[i]
             yield opensnitch.lib.decode(dnsrr.rrname), opensnitch.lib.decode(dnsrr.rdata)
 
-def _get_hostname(address):
+def get_hostname(address):
     return state._hosts.get(address, address)
 
 def _persister():

@@ -29,7 +29,8 @@ from opensnitch.lib import log
 class state:
     _lock = threading.RLock()
     _pids = {} # {pid: (path, args)}
-    _conns = {} # {(src, src_port, dst, dst_port): (pid, time)}
+    _netstat_conns = {} # {port: pid}
+    _conns = {} # {(src, src_port, dst, dst_port): pid}
     _cleanup_queue = queue.Queue(1024 * 1024)
 
 def start():
@@ -51,16 +52,30 @@ def rm_conn(src, dst, src_port, dst_port, _proto, _pid, _path, _args):
 def is_alive(_src, _dst, _src_port, _dst_port, _proto, pid, _path, _args):
     return pid == '-' or pid in state._pids
 
+def _netstat_conns():
+    xs = opensnitch.lib.check_output('netstat -lpn').splitlines()
+    xs = [x for x in xs if x.startswith('tcp ') or x.startswith('udp ')]
+    xs = [x for x in xs if not x.rstrip().endswith('-')]
+    for line in xs:
+        cols = line.split()
+        port = int(cols[3].split(':')[-1])
+        pid = cols[-1].split('/')[0]
+        state._netstat_conns[port] = pid
+
 def add_meta(src, dst, src_port, dst_port, proto, _pid, _path, _args):
-
-    # TODO add meta for the server pid on incoming connections. tcp can be seen
-    # via opensnitch-bpftrace-tcp-accept, udp can be seen via
-    # opensnitch-bpftrace-udp with source and dest address as 0.0.0.0
-
     if proto in opensnitch.lib.protos:
-        with state._lock:
-            pid, _ = state._conns[(src, src_port, dst, dst_port)]
-            path, args = state._pids[pid]
+        if opensnitch.dns.get_hostname(dst) == 'localhost':
+            try:
+                with state._lock:
+                    pid = state._netstat_conns[dst_port]
+                    path, args = state._pids[pid]
+            except KeyError:
+                opensnitch.lib.run_thread(_netstat_conns)
+                raise
+        else:
+            with state._lock:
+                pid = state._conns[(src, src_port, dst, dst_port)]
+                path, args = state._pids[pid]
     return src, dst, src_port, dst_port, proto, pid, path, args
 
 def _cb_execve(pid, path, *args):
@@ -68,11 +83,12 @@ def _cb_execve(pid, path, *args):
 
 def _cb_tcp_udp(pid, src, src_port, dst, dst_port):
     k = src, int(src_port), dst, int(dst_port)
-    start = time.monotonic()
-    state._conns[k] = pid, start
+    state._conns[k] = pid
 
 def _cb_exit(pid):
     state._pids.pop(pid, None)
+    ports = {_pid: _port for _port, _pid in state._netstat_conns.items()}
+    state._netstat_conns.pop(ports.get(pid), None)
 
 def _cb_fork(pid, child_pid):
     with state._lock:
