@@ -54,13 +54,18 @@ def is_alive(_src, _dst, _src_port, _dst_port, _proto, pid, _path, _args):
 
 def _netstat_conns():
     xs = opensnitch.lib.check_output('netstat -lpn').splitlines()
-    xs = [x for x in xs if x.startswith('tcp ') or x.startswith('udp ')]
-    xs = [x for x in xs if not x.rstrip().endswith('-')]
+    xs = [x for x in xs if '/' in x.split()[-1]]
     for line in xs:
+        print(f'DEBUG: netstat {line}')
         cols = line.split()
-        port = int(cols[3].split(':')[-1])
-        pid = cols[-1].split('/')[0]
-        state._netstat_conns[port] = pid
+        port = cols[3].split(':')[-1]
+        try:
+            port = int(port)
+        except ValueError:
+            continue
+        else:
+            pid = cols[-1].split('/')[0]
+            state._netstat_conns[port] = pid
 
 def add_meta(src, dst, src_port, dst_port, proto, _pid, _path, _args):
     if proto in opensnitch.lib.protos:
