@@ -36,8 +36,8 @@ class state:
     _new_addrs = []
 
 def start():
-    _populate_localhosts()
     _populate_hosts()
+    opensnitch.lib.run_thread(_populate_localhosts)
     opensnitch.lib.run_thread(_persister)
 
 def format(src, dst, src_port, dst_port, proto, pid, path, args):
@@ -78,11 +78,15 @@ def _populate_hosts():
         state._hosts[addr] = hostname
 
 def _populate_localhosts():
-    for line in opensnitch.lib.check_output('ip a | grep inet').splitlines() + ['- localhost -']:
-        _, addr, *_ = line.strip().split()
-        addr = addr.split('/')[0]
-        state._hosts[addr] = 'localhost'
-        state._localhosts.add(addr)
+    while True:
+        for line in opensnitch.lib.check_output('ip a | grep inet').splitlines() + ['- localhost -']:
+            _, addr, *_ = line.strip().split()
+            addr = addr.split('/')[0]
+            state._hosts[addr] = 'localhost'
+            state._localhosts.add(addr)
+        time.sleep(5)
+    print('fatal: populate hosts exited prematurely')
+    sys.exit(1)
 
 def _parse_dns(packet):
     udp = packet['UDP']
