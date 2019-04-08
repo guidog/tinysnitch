@@ -64,7 +64,7 @@ def _netstat_conns():
             pid = cols[-1].split('/')[0]
             state._netstat_conns[port] = pid
 
-def add_meta(src, dst, src_port, dst_port, proto, _pid, _path, _args):
+def add_meta(src, dst, src_port, dst_port, proto, pid, path, args):
     if proto in opensnitch.lib.protos:
         if opensnitch.dns.get_hostname(dst) == 'localhost':
             try:
