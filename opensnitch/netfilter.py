@@ -104,7 +104,7 @@ def _py_callback(id, data, size):
     finalize = lambda action, new_conn: _finalize(state._nfq_q_handle, id, data, size, conn, action, new_conn)
 
     # the fastest rule types dont require pid/path/args
-    rule = opensnitch.rules.match_rule(*conn)
+    rule = opensnitch.rules.match_rule(*opensnitch.dns.resolve(*conn))
     if rule:
         action, _duration, _start = rule
         finalize(action, conn)
