@@ -85,7 +85,8 @@ def destroy(nfq_q_handle, nfq_handle):
         assert lib.nfq_close(nfq_handle) == 0
 
 def _finalize(nfq, id, data, size, orig_conn, action, conn):
-    if not opensnitch.dns.is_inbound_dns(*conn):
+    _src, _dst, _src_port, _dst_port, proto, _pid, _path, _args = conn
+    if not opensnitch.dns.is_inbound_dns(*conn) and proto in opensnitch.lib.protos:
         log(f'INFO {action} {opensnitch.dns.format(*conn)}')
     if action == 'allow':
         lib.nfq_set_verdict(nfq, id, ONE, ZERO, NULL)

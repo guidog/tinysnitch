@@ -47,17 +47,20 @@ def enqueue(finalize, conn):
     state._queue.put((finalize, conn, repeats))
 
 def match_rule(_src, dst, _src_port, dst_port, proto, _pid, path, args):
-    keys = [(dst, dst_port, proto, path, args), # addr, port, path, args
-            (dst, dst_port, proto, path, '-'),  # addr, port, path
-            (dst, dst_port, proto, '-', '-'),   # addr, port
-            (dst, '-', proto, path, args),      # addr, path, args
-            (dst, '-', proto, path, '-'),       # addr, path
-            (dst, '-', proto, '-', '-')]        # addr
-    for k in keys:
-        try:
-            return state._rules[k]
-        except KeyError:
-            pass
+    if proto not in opensnitch.lib.protos:
+        return 'allow', None, None # allow all non tcp/udp
+    else:
+        keys = [(dst, dst_port, proto, path, args), # addr, port, path, args
+                (dst, dst_port, proto, path, '-'),  # addr, port, path
+                (dst, dst_port, proto, '-', '-'),   # addr, port
+                (dst, '-', proto, path, args),      # addr, path, args
+                (dst, '-', proto, path, '-'),       # addr, path
+                (dst, '-', proto, '-', '-')]        # addr
+        for k in keys:
+            try:
+                return state._rules[k]
+            except KeyError:
+                pass
 
 def check(finalize, conn):
     conn = opensnitch.dns.resolve(*conn)
