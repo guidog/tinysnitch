@@ -42,7 +42,9 @@ def start():
               ('opensnitch-bpftrace-exit', _cb_exit),
               ('opensnitch-bcc-execve', _cb_execve)]
     for program, cb in _pairs:
-        opensnitch.lib.run_thread(_tail, program, cb)
+        proc = subprocess.Popen(['stdbuf', '-o0', program], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        opensnitch.lib.run_thread(opensnitch.lib.monitor, proc)
+        opensnitch.lib.run_thread(_tail, program, proc, cb)
 
 def rm_conn(src, dst, src_port, dst_port, _proto, _pid, _path, _args):
     state._cleanup_queue.put((src, src_port, dst, dst_port, time.monotonic()))
@@ -111,26 +113,21 @@ def _gc():
     log('ERROR trace gc exited prematurely')
     sys.exit(1)
 
-def _tail(name, callback):
-    proc = None
+def _tail(name, proc, callback):
+    log(f'INFO start tailing {name}')
     while True:
-        if proc:
-            proc.terminate()
-        proc = subprocess.Popen(['stdbuf', '-o0', name], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        log(f'INFO start tailing {name}')
-        while True:
+        try:
+            line = proc.stdout.readline().rstrip().decode('utf-8')
+        except UnicodeDecodeError:
+            log(f'WARN failed to utf-8 decode {name} line {[line]}')
+        else:
+            if not line:
+                break
             try:
-                line = proc.stdout.readline().rstrip().decode('utf-8')
-            except UnicodeDecodeError:
-                log(f'WARN failed to utf-8 decode {name} line {[line]}')
-            else:
-                if not line:
-                    break
-                try:
-                    callback(*line.split())
-                except TypeError:
-                    # log(f'WARN bad {name} line {[line]}')
-                    pass
+                callback(*line.split())
+            except TypeError:
+                # log(f'WARN bad {name} line {[line]}')
+                pass
     log(f'FATAL tail {name} exited prematurely')
     sys.exit(1)
 
