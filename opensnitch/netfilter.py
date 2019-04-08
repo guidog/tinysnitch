@@ -103,12 +103,13 @@ def _py_callback(id, data, size):
     opensnitch.dns.update_hosts(packet)
     conn = opensnitch.lib.conn(packet)
     finalize = lambda action, new_conn: _finalize(state._nfq_q_handle, id, data, size, conn, action, new_conn)
+    resolved_conn = opensnitch.dns.resolve(*conn)
 
     # the fastest rule types dont require pid/path/args
-    rule = opensnitch.rules.match_rule(*opensnitch.dns.resolve(*conn))
+    rule = opensnitch.rules.match_rule(*resolved_conn)
     if rule:
         action, _duration, _start = rule
-        finalize(action, conn)
+        finalize(action, resolved_conn)
 
     # auto allow and dont double print dns packets, the only ones we track after --ctstate NEW, so that we can log the solved addr
     elif opensnitch.dns.is_inbound_dns(*conn):
