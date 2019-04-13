@@ -40,7 +40,7 @@ def conn(packet):
     return src, dst, src_port, dst_port, proto, pid, path, args
 
 def log(x):
-    print(x, flush=True)
+    print(x)
 
 def check_call(*a):
     subprocess.check_call(' '.join(map(str, a)), shell=True, executable='/bin/bash')
