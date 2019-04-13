@@ -26,6 +26,8 @@ import sys
 import time
 from opensnitch.lib import log
 
+assert '1' == opensnitch.lib.check_output('ls /home | wc -l') or 'prompt_user' in os.environ, 'in a multi-user environment please specify the user to display X11 prompts as via env variable $prompt_user'
+_prompt_user = os.environ.get('prompt_user', opensnitch.lib.check_output('ls /home | head -n1'))
 _actions = {'allow', 'deny'}
 _rules_file = '/etc/opensnitch.rules'
 
@@ -175,7 +177,7 @@ def _process_prompt_queue():
                 finalize(action, conn)
             else:
                 try:
-                    duration, scope, action, granularity = opensnitch.lib.check_output(f'DISPLAY=:0 opensnitch-prompt "{opensnitch.dns.format(*conn)}" 2>/dev/null').split()
+                    duration, scope, action, granularity = opensnitch.lib.check_output(f'sudo su {_prompt_user} -c \'DISPLAY=:0 opensnitch-prompt "{opensnitch.dns.format(*conn)}"\' 2>/dev/null').split()
                 except:
                     log('ERROR failed run opensnitch-prompt')
                     finalize('deny', conn)
