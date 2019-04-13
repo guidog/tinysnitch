@@ -53,11 +53,24 @@ def rm_conn(src, dst, src_port, dst_port, _proto, _pid, _path, _args):
 def is_alive(_src, _dst, _src_port, _dst_port, _proto, pid, _path, _args):
     return pid == '-' or pid in state._pids
 
+def netstat_online_lookup(src, dst, src_port, dst_port, proto, pid, path, args):
+    xs = opensnitch.lib.check_output('ss -tupnH').splitlines()
+    for x in xs:
+        _proto, _state, _, _, _src, _dst, _program = x.split()
+        if f'{src}:{src_port}' == _src and f'{dst}:{dst_port}' == _dst:
+            pid = _program.split('pid=')[-1].split(',')[0]
+            try:
+                path, *args = opensnitch.lib.check_output('ps --no-heading -o args', pid).split()
+                args = ' '.join(args)
+            except subprocess.CalledProcessError:
+                pass # the pid could be gone by ps time
+    return src, dst, src_port, dst_port, proto, pid, path, args
+
 def _netstat_conns():
     acquired = state._netstat_lock.acquire(blocking=False)
     if acquired:
         try:
-            xs = opensnitch.lib.check_output('netstat -lpn').splitlines()
+            xs = opensnitch.lib.check_output('netstat -lpn').splitlines() # TODO replace netstat with: sudo ss -tupanH
             xs = [x for x in xs if '/' in x.split()[-1]]
             for line in xs:
                 cols = line.split()

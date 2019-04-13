@@ -116,11 +116,14 @@ def _py_callback(id, data, size):
         finalize('allow', conn)
 
     else:
-        # make an attempt to add meta and process inline
+        # make a single attempt to add meta
         try:
             conn = opensnitch.trace.add_meta(*conn)
-            opensnitch.rules.check(finalize, conn)
 
         # otherwise enqueue for delayed processing
         except KeyError:
             opensnitch.rules.enqueue(finalize, conn)
+
+        # on good meta lookup, process inline
+        else:
+            opensnitch.rules.check(finalize, conn)

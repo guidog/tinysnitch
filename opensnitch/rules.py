@@ -34,6 +34,7 @@ _rules_file = '/etc/opensnitch.rules'
 class state:
     _rules = {}
     _queue = queue.Queue(1024)
+    _online_netstat_lookup_queue = queue.Queue(1024)
     _delay_queue = queue.Queue(1024)
     _prompt_queue = queue.Queue(1024)
 
@@ -43,6 +44,7 @@ def start():
     opensnitch.lib.run_thread(_process_queue)
     opensnitch.lib.run_thread(_process_delay_queue)
     opensnitch.lib.run_thread(_process_prompt_queue)
+    opensnitch.lib.run_thread(_process_online_netstat_lookups_queue)
 
 def enqueue(finalize, conn):
     repeats = 0
@@ -97,14 +99,15 @@ def _process_queue():
     while True:
         finalize, conn, repeats = state._queue.get()
         try:
-            if repeats < 100: # TODO instead of polling should we react to trace events?
-                conn = opensnitch.trace.add_meta(*conn)
-                if repeats:
-                    log(f'DEBUG resolved meta after spinning {repeats} times for {opensnitch.dns.format(*conn)}')
-            else:
-                log(f'DEBUG gave up trying to add meta to {opensnitch.dns.format(*conn)}')
+            assert repeats < 100 # TODO instead of polling should we react to trace events?, tbh this is prob fine
+            conn = opensnitch.trace.add_meta(*conn)
+            if repeats:
+                log(f'DEBUG resolved meta after spinning {repeats} times for {opensnitch.dns.format(*conn)}')
         except KeyError:
             state._delay_queue.put((finalize, conn, repeats + 1))
+        except AssertionError:
+            log(f'DEBUG fallback to online netstat lookup of meta for {opensnitch.dns.format(*conn)}')
+            state._online_netstat_lookup_queue.put((finalize, conn))
         else:
             check(finalize, conn)
     log('FATAL rules process-queue exited prematurely')
@@ -185,6 +188,14 @@ def _process_prompt_queue():
                     action = _process_rule(conn, duration, scope, action, granularity)
                     finalize(action, conn)
     log('FATAL process-prompt-queue exited prematurely')
+    sys.exit(1)
+
+def _process_online_netstat_lookups_queue():
+    while True:
+        finalize, conn = state._online_netstat_lookup_queue.get()
+        conn = opensnitch.trace.netstat_online_lookup(*conn)
+        check(finalize, conn)
+    log('FATAL process-online-netstat-lookups-queue exited prematurely')
     sys.exit(1)
 
 def _process_rule(conn, duration, scope, action, granularity):
