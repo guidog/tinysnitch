@@ -29,6 +29,7 @@ from opensnitch.lib import log
 class state:
     _lock = threading.RLock()
     _pids = {} # {pid: (path, args)}
+    _netstat_lock = threading.RLock()
     _netstat_conns = {} # {port: pid}
     _conns = {} # {(src, src_port, dst, dst_port): pid}
     _cleanup_queue = queue.Queue(1024 * 1024)
@@ -53,18 +54,23 @@ def is_alive(_src, _dst, _src_port, _dst_port, _proto, pid, _path, _args):
     return pid == '-' or pid in state._pids
 
 def _netstat_conns():
-    xs = opensnitch.lib.check_output('netstat -lpn').splitlines()
-    xs = [x for x in xs if '/' in x.split()[-1]]
-    for line in xs:
-        cols = line.split()
-        port = cols[3].split(':')[-1]
+    acquired = state._netstat_lock.acquire(blocking=False)
+    if acquired:
         try:
-            port = int(port)
-        except ValueError:
-            continue
-        else:
-            pid = cols[-1].split('/')[0]
-            state._netstat_conns[port] = pid
+            xs = opensnitch.lib.check_output('netstat -lpn').splitlines()
+            xs = [x for x in xs if '/' in x.split()[-1]]
+            for line in xs:
+                cols = line.split()
+                port = cols[3].split(':')[-1]
+                try:
+                    port = int(port)
+                except ValueError:
+                    continue
+                else:
+                    pid = cols[-1].split('/')[0]
+                    state._netstat_conns[port] = pid
+        finally:
+            state._netstat_lock.release()
 
 def add_meta(src, dst, src_port, dst_port, proto, pid, path, args):
     # note: meta data has to happen on un-resolved src/dst addresses, ie ipv4 addresses
