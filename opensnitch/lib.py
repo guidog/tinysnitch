@@ -26,7 +26,7 @@ import signal
 import sys
 import time
 
-protos = {'tcp', 'udp'}
+protos = {'tcp', 'udp', 'tcp-src', 'udp-src'} # *-src are used to create rules for incoming connections based on the remote src ip, since dst is always localhost
 
 def conn(packet):
     src = packet.src

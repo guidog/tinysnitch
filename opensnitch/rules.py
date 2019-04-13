@@ -66,14 +66,43 @@ def match_rule(_src, dst, _src_port, dst_port, proto, _pid, path, args):
             except KeyError:
                 pass
 
+def to_src_conn(src, dst, src_port, dst_port, proto, pid, path, args):
+    # src rules are differentiated by a suffix on proto, which
+    # indicates that what is normally the dst is in fact now src
+    proto = proto.split('-')[0] + '-src'
+    return dst, src, src_port, dst_port, proto, pid, path, args
+
 def check(finalize, conn):
     conn = opensnitch.dns.resolve(*conn)
-    rule = match_rule(*conn)
-    if rule:
-        action, _duration, _start = rule
-        finalize(action, conn)
+    _src, dst, _src_port, _dst_port, _proto, _pid, _path, _args = conn
+    # when the destination is localhost, two rules are required. one to allow
+    # that localhost destination, and a second to allow the inbound request
+    # based on the remote src. ie you can allow localhost 8000 independently of
+    # allowing a remote ipv4 to hit localhost 8000.
+    if opensnitch.dns.is_localhost(dst):
+        dst_rule = match_rule(*conn)
+        if dst_rule:
+            action, _duration, _start = dst_rule
+            if action == 'deny':
+                return finalize('deny', conn)
+        src_conn = to_src_conn(*conn)
+        src_rule = match_rule(*src_conn)
+        if src_rule:
+            action, _duration, _start = src_rule
+            if action == 'deny':
+                return finalize('deny', src_conn)
+        if not dst_rule or not src_rule:
+            state._prompt_queue.put((finalize, conn))
+        else:
+            finalize('allow', conn)
+    # when dst is not localhost, only one rule is required
     else:
-        state._prompt_queue.put((finalize, conn))
+        rule = match_rule(*conn)
+        if rule:
+            action, _duration, _start = rule
+            finalize(action, conn)
+        else:
+            state._prompt_queue.put((finalize, conn))
 
 def _add_rule(action, duration, start, dst, dst_port, proto, path, args):
     k = dst, dst_port, proto, path, args
@@ -169,10 +198,54 @@ def _load_permanent_rules():
         log(f'INFO loaded {i + 1} rules from {_rules_file}')
 
 def _process_prompt_queue():
+    # we match rule again here in case a rule was added while this conn was
+    # waiting in the queue
     while True:
         finalize, conn = state._prompt_queue.get()
+        _src, dst, _src_port, _dst_port, _proto, _pid, _path, _args = conn
         if not opensnitch.trace.is_alive(*conn):
             finalize('deny', conn)
+        elif opensnitch.dns.is_localhost(dst):
+            dst_rule = match_rule(*conn)
+            if dst_rule:
+                action, _duration, _start = dst_rule
+                if action == 'deny':
+                    finalize('deny', conn)
+                    continue
+            else:
+                try:
+                    duration, scope, action, granularity = opensnitch.lib.check_output(f'sudo su {_prompt_user} -c \'DISPLAY=:0 opensnitch-prompt "{opensnitch.dns.format(*conn)}"\' 2>/dev/null').split()
+                except:
+                    log('ERROR failed run opensnitch-prompt')
+                    return finalize('deny', conn)
+                else:
+                    action = _process_rule(conn, duration, scope, action, granularity)
+                    if action == 'deny':
+                        finalize('deny', conn)
+                        continue
+            src_conn = to_src_conn(*conn)
+            try:
+                src_conn = opensnitch.trace.add_meta(*src_conn)
+            except KeyError:
+                pass # best effort to show client program for localhost src-conn
+            src_rule = match_rule(*src_conn)
+            if src_rule:
+                action, _duration, _start = src_rule
+                if action == 'deny':
+                    finalize('deny', src_conn)
+            else:
+                try:
+                    duration, scope, action, granularity = opensnitch.lib.check_output(f'sudo su {_prompt_user} -c \'DISPLAY=:0 opensnitch-prompt "{opensnitch.dns.format(*src_conn)}"\' 2>/dev/null').split()
+                except:
+                    log('ERROR failed run opensnitch-prompt')
+                    finalize('deny', src_conn)
+                    continue
+                else:
+                    action = _process_rule(src_conn, duration, scope, action, granularity)
+                    if action == 'deny':
+                        finalize('deny', src_conn)
+                        continue
+            finalize('allow', conn)
         else:
             rule = match_rule(*conn)
             if rule:
