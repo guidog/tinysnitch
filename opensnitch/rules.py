@@ -34,7 +34,7 @@ _rules_file = '/etc/opensnitch.rules'
 class state:
     _rules = {}
     _queue = queue.Queue(1024)
-    _online_netstat_lookup_queue = queue.Queue(1024)
+    _online_meta_lookup_queue = queue.Queue(1024)
     _delay_queue = queue.Queue(1024)
     _prompt_queue = queue.Queue(1024)
 
@@ -44,7 +44,7 @@ def start():
     opensnitch.lib.run_thread(_process_queue)
     opensnitch.lib.run_thread(_process_delay_queue)
     opensnitch.lib.run_thread(_process_prompt_queue)
-    opensnitch.lib.run_thread(_process_online_netstat_lookups_queue)
+    opensnitch.lib.run_thread(_process_online_meta_lookups_queue)
 
 def enqueue(finalize, conn):
     repeats = 0
@@ -106,8 +106,8 @@ def _process_queue():
         except KeyError:
             state._delay_queue.put((finalize, conn, repeats + 1))
         except AssertionError:
-            log(f'DEBUG fallback to online netstat lookup of meta for {opensnitch.dns.format(*conn)}')
-            state._online_netstat_lookup_queue.put((finalize, conn))
+            log(f'DEBUG fallback to online meta lookup for {opensnitch.dns.format(*conn)}')
+            state._online_meta_lookup_queue.put((finalize, conn))
         else:
             check(finalize, conn)
     log('FATAL rules process-queue exited prematurely')
@@ -190,12 +190,12 @@ def _process_prompt_queue():
     log('FATAL process-prompt-queue exited prematurely')
     sys.exit(1)
 
-def _process_online_netstat_lookups_queue():
+def _process_online_meta_lookups_queue():
     while True:
-        finalize, conn = state._online_netstat_lookup_queue.get()
-        conn = opensnitch.trace.netstat_online_lookup(*conn)
+        finalize, conn = state._online_meta_lookup_queue.get()
+        conn = opensnitch.trace.online_meta_lookup(*conn)
         check(finalize, conn)
-    log('FATAL process-online-netstat-lookups-queue exited prematurely')
+    log('FATAL process-online-meta-lookups-queue exited prematurely')
     sys.exit(1)
 
 def _process_rule(conn, duration, scope, action, granularity):

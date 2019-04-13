@@ -29,8 +29,8 @@ from opensnitch.lib import log
 class state:
     _lock = threading.RLock()
     _pids = {} # {pid: (path, args)}
-    _netstat_lock = threading.RLock()
-    _netstat_conns = {} # {port: pid}
+    _listening_lock = threading.RLock()
+    _listening_conns = {} # {port: pid}
     _conns = {} # {(src, src_port, dst, dst_port): pid}
     _cleanup_queue = queue.Queue(1024 * 1024)
 
@@ -53,7 +53,7 @@ def rm_conn(src, dst, src_port, dst_port, _proto, _pid, _path, _args):
 def is_alive(_src, _dst, _src_port, _dst_port, _proto, pid, _path, _args):
     return pid == '-' or pid in state._pids
 
-def netstat_online_lookup(src, dst, src_port, dst_port, proto, pid, path, args):
+def online_meta_lookup(src, dst, src_port, dst_port, proto, pid, path, args):
     xs = opensnitch.lib.check_output('ss -tupnH').splitlines()
     for x in xs:
         try:
@@ -70,8 +70,8 @@ def netstat_online_lookup(src, dst, src_port, dst_port, proto, pid, path, args):
                     pass # the pid could be gone by ps time
     return src, dst, src_port, dst_port, proto, pid, path, args
 
-def _netstat_conns():
-    acquired = state._netstat_lock.acquire(blocking=False)
+def _listening_conns():
+    acquired = state._listening_lock.acquire(blocking=False)
     if acquired:
         try:
             xs = opensnitch.lib.check_output('ss -tuplnH').splitlines()
@@ -81,11 +81,11 @@ def _netstat_conns():
                     port = src.split(':')[-1]
                     port = int(port)
                     pid = program.split('pid=')[-1].split(',')[0]
-                    state._netstat_conns[port] = pid
+                    state._listening_conns[port] = pid
                 except:
                     print('ERROR bad ss -l output', [x])
         finally:
-            state._netstat_lock.release()
+            state._listening_lock.release()
 
 def add_meta(src, dst, src_port, dst_port, proto, pid, path, args):
     # note: meta data has to happen on un-resolved src/dst addresses, ie ipv4 addresses
@@ -93,10 +93,10 @@ def add_meta(src, dst, src_port, dst_port, proto, pid, path, args):
         if opensnitch.dns.get_hostname(dst) == 'localhost' and opensnitch.dns.get_hostname(src) != 'localhost':
             try:
                 with state._lock:
-                    pid = state._netstat_conns[dst_port]
+                    pid = state._listening_conns[dst_port]
                     path, args = state._pids[pid]
             except KeyError:
-                opensnitch.lib.run_thread(_netstat_conns) # if we miss on a listening server, lookup all listening pids
+                opensnitch.lib.run_thread(_listening_conns) # if we miss on a listening server, lookup all listening pids
                 raise
         else:
             with state._lock:
@@ -113,8 +113,8 @@ def _cb_tcp_udp(pid, src, src_port, dst, dst_port):
 
 def _cb_exit(pid):
     state._pids.pop(pid, None)
-    ports = {_pid: _port for _port, _pid in state._netstat_conns.items()}
-    state._netstat_conns.pop(ports.get(pid), None)
+    ports = {_pid: _port for _port, _pid in state._listening_conns.items()}
+    state._listening_conns.pop(ports.get(pid), None)
 
 def _cb_fork(pid, child_pid):
     with state._lock:
