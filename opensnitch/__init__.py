@@ -53,8 +53,11 @@ def main(setup_firewall=False, teardown_firewall=False, log_sizes=False):
         for rule in _iptables_rules:
             opensnitch.lib.check_call('iptables -D', rule, '|| echo failed to delete:', rule)
     else:
-        output = opensnitch.lib.check_output('ps -ef | grep "bin/opensnitch\-b" | grep -v grep || true')
-        assert not output, f'you have zombie traces running from an unclean exit, kill them before restarting opensnitch: {output}'
+        trace_pids = opensnitch.lib.check_output('ps -ef | grep "bin/opensnitch\-b" | grep -v grep | awk "{print \$2}"').splitlines()
+        if trace_pids:
+            for pid in trace_pids:
+                print('DEBUG killing existing trace program:', opensnitch.lib.check_output('ps', pid))
+                opensnitch.lib.check_call('sudo kill', pid)
         if log_sizes:
             opensnitch.lib.run_thread(_log_sizes)
         opensnitch.dns.start()
