@@ -90,7 +90,7 @@ def _listening_conns():
 def add_meta(src, dst, src_port, dst_port, proto, pid, path, args):
     # note: meta data has to happen on un-resolved src/dst addresses, ie ipv4 addresses
     if proto in opensnitch.lib.protos:
-        if opensnitch.dns.get_hostname(dst) == 'localhost' and opensnitch.dns.get_hostname(src) != 'localhost':
+        if opensnitch.dns.is_localhost(dst) and not opensnitch.dns.is_localhost(src): # TODO this should go away once we have inbound and outbound rules, because it becomes two seperate prompts
             try:
                 with state._lock:
                     pid = state._listening_conns[dst_port]

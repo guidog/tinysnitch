@@ -41,7 +41,7 @@ def start():
     opensnitch.lib.run_thread(_persister)
 
 def format(src, dst, src_port, dst_port, proto, pid, path, args):
-    if opensnitch.dns.is_localhost(dst):
+    if is_localhost(dst):
         return f'{proto} | {dst}:{dst_port} <- {src}:{src_port} | {pid} {path} | {args}'
     else:
         return f'{proto} | {src}:{src_port} -> {dst}:{dst_port} | {pid} {path} | {args}'
