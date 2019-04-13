@@ -56,14 +56,18 @@ def is_alive(_src, _dst, _src_port, _dst_port, _proto, pid, _path, _args):
 def netstat_online_lookup(src, dst, src_port, dst_port, proto, pid, path, args):
     xs = opensnitch.lib.check_output('ss -tupnH').splitlines()
     for x in xs:
-        _proto, _state, _, _, _src, _dst, _program = x.split()
-        if f'{src}:{src_port}' == _src and f'{dst}:{dst_port}' == _dst:
-            pid = _program.split('pid=')[-1].split(',')[0]
-            try:
-                path, *args = opensnitch.lib.check_output('ps --no-heading -o args', pid).split()
-                args = ' '.join(args)
-            except subprocess.CalledProcessError:
-                pass # the pid could be gone by ps time
+        try:
+            _proto, _state, _, _, _src, _dst, _program = x.split()
+        except ValueError:
+            print('ERROR bad ss line output:', [x])
+        else:
+            if f'{src}:{src_port}' == _src and f'{dst}:{dst_port}' == _dst:
+                pid = _program.split('pid=')[-1].split(',')[0]
+                try:
+                    path, *args = opensnitch.lib.check_output('ps --no-heading -o args', pid).split()
+                    args = ' '.join(args)
+                except subprocess.CalledProcessError:
+                    pass # the pid could be gone by ps time
     return src, dst, src_port, dst_port, proto, pid, path, args
 
 def _netstat_conns():
@@ -94,7 +98,7 @@ def add_meta(src, dst, src_port, dst_port, proto, pid, path, args):
                     pid = state._netstat_conns[dst_port]
                     path, args = state._pids[pid]
             except KeyError:
-                opensnitch.lib.run_thread(_netstat_conns)
+                opensnitch.lib.run_thread(_netstat_conns) # if we miss on a listening server, lookup all listening pids
                 raise
         else:
             with state._lock:
