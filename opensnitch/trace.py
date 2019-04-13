@@ -74,18 +74,16 @@ def _netstat_conns():
     acquired = state._netstat_lock.acquire(blocking=False)
     if acquired:
         try:
-            xs = opensnitch.lib.check_output('netstat -lpn').splitlines() # TODO replace netstat with: sudo ss -tupanH
-            xs = [x for x in xs if '/' in x.split()[-1]]
-            for line in xs:
-                cols = line.split()
-                port = cols[3].split(':')[-1]
+            xs = opensnitch.lib.check_output('ss -tuplnH').splitlines()
+            for x in xs:
                 try:
+                    _proto, _state, _, _, src, dst, program = x.split()
+                    port = src.split(':')[-1]
                     port = int(port)
-                except ValueError:
-                    continue
-                else:
-                    pid = cols[-1].split('/')[0]
+                    pid = program.split('pid=')[-1].split(',')[0]
                     state._netstat_conns[port] = pid
+                except:
+                    print('ERROR bad ss -l output', [x])
         finally:
             state._netstat_lock.release()
 
