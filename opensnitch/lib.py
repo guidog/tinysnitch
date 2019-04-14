@@ -17,6 +17,7 @@
 # or write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
+import datetime
 import subprocess
 import threading
 import os
@@ -40,7 +41,7 @@ def conn(packet):
     return src, dst, src_port, dst_port, proto, pid, path, args
 
 def log(x):
-    print(x)
+    print(datetime.datetime.now().isoformat(), x, flush=True)
 
 def check_call(*a):
     subprocess.check_call(' '.join(map(str, a)), shell=True, executable='/bin/bash')
