@@ -20,7 +20,7 @@ class MainWindow(QtWidgets.QMainWindow):
         palette = self.palette()
         palette.setColor(self.backgroundRole(), QColor(20, 20, 20))
         self.setPalette(palette)
-        self.setStyleSheet("QLabel { font: 16pt Mono; color: rgb(200,200,200); }")
+        self.setStyleSheet("QLabel { font: 14pt Mono; color: rgb(200,200,200); }")
         self.title = QtWidgets.QLabel('', self)
         self.title.setAlignment(QtCore.Qt.AlignCenter)
         gridLayout.addWidget(self.title, 0, 0)
@@ -32,7 +32,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.scope = 'port-domain'
         self.action = 'no'
         self.help = False
-        self.text = ' '.join(words).replace('|', '\n\n')
+        self.text = ' '.join(words).replace('<', '&lt;').replace('>', '&gt;').split('|')
         self.update()
 
     def keyPressEvent(self, event, **kw):
@@ -73,7 +73,28 @@ class MainWindow(QtWidgets.QMainWindow):
         self.update()
 
     def update(self):
-        self.title.setText(f'{self.text}\n\n{"-" * 250}\n\n{self.duration} {self.scope} {self.granularity}\n\n(y)es (n)o (h)elp')
+        yellow = lambda x: f'<span style="color: rgb(220, 220, 0);">[{x}]</span>'
+        proto, target, pid, args = self.text
+        src, arrow, dst = target.split()
+        if src.startswith('localhost:') and not proto.strip().endswith('-src'):
+            if self.scope == 'domain':
+                a, b = src.split(':')
+                src = f'{yellow(a)}:{b}'
+            else:
+                src = yellow(src)
+        else:
+            if self.scope == 'domain':
+                a, b = dst.split(':')
+                dst = f'{yellow(a)}:{b}'
+            else:
+                dst = yellow(dst)
+        pid, path = pid.split()
+        path = yellow(path)
+        if self.granularity == 'args-and-path':
+            args = yellow(args.strip())
+        text = [proto, ' '.join([src, arrow, dst]), ' '.join([pid, path]), args]
+        text = '\n\n'.join(text)
+        self.title.setText(f'<span/>{text}\n\n{"-" * 250}\n\n{self.duration} {self.scope} {self.granularity}\n\n(y)es (n)o (h)elp'.replace('\n', '<br/>'))
 
     def exit(self):
         self.update()
