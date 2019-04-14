@@ -76,12 +76,12 @@ class MainWindow(QtWidgets.QMainWindow):
         yellow = lambda x: f'<span style="color: rgb(220, 220, 0);">[{x}]</span>'
         proto, target, pid, args = self.text
         src, arrow, dst = target.split()
-        if src.startswith('localhost:') and not proto.strip().endswith('-src'):
-            if self.scope == 'domain':
-                a, b = src.split(':')
-                src = f'{yellow(a)}:{b}'
-            else:
-                src = yellow(src)
+        if proto.strip().endswith('-src'):
+            a, b = src.split(':')
+            src = f'{yellow(a)}:{b}'
+            if self.scope != 'domain':
+                a, b = dst.split(':')
+                dst = f'{a}:{yellow(b)}'
         else:
             if self.scope == 'domain':
                 a, b = dst.split(':')

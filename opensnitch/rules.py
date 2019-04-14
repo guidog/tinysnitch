@@ -66,11 +66,16 @@ def match_rule(_src, dst, _src_port, dst_port, proto, _pid, path, args):
             except KeyError:
                 pass
 
+def to_src_proto(src, dst, src_port, dst_port, proto, pid, path, args):
+    proto = proto.split('-')[0] + '-src'
+    return src, dst, src_port, dst_port, proto, pid, path, args
+
 def to_src_conn(src, dst, src_port, dst_port, proto, pid, path, args):
     # src rules are differentiated by a suffix on proto, which
     # indicates that what is normally the dst is in fact now src
     proto = proto.split('-')[0] + '-src'
-    return dst, src, src_port, dst_port, proto, pid, path, args
+    src, dst = dst, src
+    return src, dst, src_port, dst_port, proto, pid, path, args
 
 def check(finalize, conn):
     conn = opensnitch.dns.resolve(*conn)
@@ -235,7 +240,7 @@ def _process_prompt_queue():
                     finalize('deny', src_conn)
             else:
                 try:
-                    duration, scope, action, granularity = opensnitch.lib.check_output(f'sudo su {_prompt_user} -c \'DISPLAY=:0 opensnitch-prompt "{opensnitch.dns.format(*src_conn)}"\' 2>/dev/null').split()
+                    duration, scope, action, granularity = opensnitch.lib.check_output(f'sudo su {_prompt_user} -c \'DISPLAY=:0 opensnitch-prompt "{opensnitch.dns.format(*to_src_proto(*conn))}"\' 2>/dev/null').split()
                 except:
                     log('ERROR failed run opensnitch-prompt')
                     finalize('deny', src_conn)
