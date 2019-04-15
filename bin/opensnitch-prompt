@@ -31,7 +31,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.granularity = 'args-and-path'
         self.scope = 'port-domain'
         self.action = 'no'
-        self.help = False
+        self.help = self.legend = False
         self.text = ' '.join(words).replace('<', '&lt;').replace('>', '&gt;').split('|')
         self.seconds = 60
         self.timer = QtCore.QTimer()
@@ -48,8 +48,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def keyPressEvent(self, event, **kw):
         key = event.key()
-        if self.help:
-            self.help = False
+        if self.help or self.legend:
+            self.help = self.legend = False
             self.update()
         else:
             if key == 89: # y
@@ -76,36 +76,43 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.duration = 'forever'
             elif key == 72: # h
                 self.help = True
-                return self.title.setText('<p style="line-height: 50px;"><span style="font-weight: bold;">actions</span><br/>(y)es<br/>(n)o<br/><br/><span style="font-weight: bold;">scope</span><br/>(d)omain<br/>(p)ort-domain<br/><br/><span style="font-weight: bold;">granularity</span><br/>(a)rgs-and-path<br/>(j)ust-path<br/><br/><span style="font-weight: bold;">duration</span><br/>(o)nce<br/>(1)minute<br/>(3)minutes<br/>(9)minutes<br/>(u)ntil-quit<br/>(f)orever</p>') # noqa
             elif key == 65: # a
                 self.granularity = 'args-and-path'
             elif key == 74: # j
                 self.granularity = 'just-path'
+            elif key == 76: # l
+                self.legend = True
         self.update()
 
     def update(self):
-        yellow = lambda x: f'<span style="color: rgb(220, 220, 0);">[{x}]</span>'
-        proto, target, pid, args = self.text
-        src, arrow, dst = target.split()
-        if proto.strip().endswith('-src'):
-            a, b = src.split(':')
-            src = f'{yellow(a)}:{b}'
-            if self.scope != 'domain':
-                a, b = dst.split(':')
-                dst = f'{a}:{yellow(b)}'
+        if self.help:
+            self.title.setText('<p style="line-height: 50px;"><span style="font-weight: bold;">actions</span><br/>(y)es<br/>(n)o<br/><br/><span style="font-weight: bold;">scope</span><br/>(d)omain<br/>(p)ort-domain<br/><br/><span style="font-weight: bold;">granularity</span><br/>(a)rgs-and-path<br/>(j)ust-path<br/><br/><span style="font-weight: bold;">duration</span><br/>(o)nce<br/>(1)minute<br/>(3)minutes<br/>(9)minutes<br/>(u)ntil-quit<br/>(f)orever</p>') # noqa
+        elif self.legend:
+            text = '\n\n'.join(['protocol', ' '.join(['src:port', '->', 'dst:port']), ' '.join(['pid', 'program']), 'args'])
+            self.title.setText(f'<span/>{text}\n\n{"-" * 250}\n\nduration scope granularity\n\n(y)es (n)o (h)elp (l)egend\n\n{"-" * 250}\n\n{self.seconds} seconds until DENY'.replace('\n', '<br/>'))
         else:
-            if self.scope == 'domain':
-                a, b = dst.split(':')
-                dst = f'{yellow(a)}:{b}'
+            yellow = lambda x: f'<span style="color: rgb(220, 220, 0);">[{x}]</span>'
+            proto, target, pid, args = self.text
+            src, arrow, dst = target.split()
+            if proto.strip().endswith('-src'):
+                a, b = src.split(':')
+                src = f'{yellow(a)}:{b}'
+                if self.scope != 'domain':
+                    a, b = dst.split(':')
+                    dst = f'{a}:{yellow(b)}'
             else:
-                dst = yellow(dst)
-        pid, path = pid.split()
-        path = yellow(path)
-        if self.granularity == 'args-and-path':
-            args = yellow(args.strip())
-        text = [proto, ' '.join([src, arrow, dst]), ' '.join([pid, path]), args]
-        text = '\n\n'.join(text)
-        self.title.setText(f'<span/>{text}\n\n{"-" * 250}\n\n{self.duration} {self.scope} {self.granularity}\n\n(y)es (n)o (h)elp\n\n{"-" * 250}\n\n{self.seconds} seconds until DENY'.replace('\n', '<br/>'))
+                if self.scope == 'domain':
+                    a, b = dst.split(':')
+                    dst = f'{yellow(a)}:{b}'
+                else:
+                    dst = yellow(dst)
+            pid, path = pid.split()
+            path = yellow(path)
+            if self.granularity == 'args-and-path':
+                args = yellow(args.strip())
+            text = [proto, ' '.join([src, arrow, dst]), ' '.join([pid, path]), args]
+            text = '\n\n'.join(text)
+            self.title.setText(f'<span/>{text}\n\n{"-" * 250}\n\n{self.duration} {self.scope} {self.granularity}\n\n(y)es (n)o (h)elp (l)egend\n\n{"-" * 250}\n\n{self.seconds} seconds until DENY'.replace('\n', '<br/>'))
 
     def exit(self):
         self.update()
