@@ -194,11 +194,7 @@ def _load_permanent_rules():
             action, dst, dst_port, proto, path, args = rule
             duration = start = None
             _add_rule(action, duration, start, dst, dst_port, proto, path, args)
-    for i, ((dst, dst_port, proto, path, args), (action, _, _)) in enumerate(sorted(state._rules.items(), key=str)):
-        log(f'INFO loaded rule {action} {dst} {dst_port} {proto} {path} {args}')
-        if i > 20:
-            log('INFO stopped logging rules...')
-            break
+            log(f'INFO loaded rule {action} {dst} {dst_port} {proto} {path} {args}')
     if list(lines):
         log(f'INFO loaded {i + 1} rules from {_rules_file}')
 
