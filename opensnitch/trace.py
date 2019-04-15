@@ -71,7 +71,7 @@ def online_meta_lookup(src, dst, src_port, dst_port, proto, pid, path, args):
     return src, dst, src_port, dst_port, proto, pid, path, args
 
 def _listening_conns():
-    acquired = state._listening_lock.acquire(blocking=False)
+    acquired = state._listening_lock.acquire(blocking=False) # only run one of these a time, the others just immediately exit
     if acquired:
         try:
             xs = opensnitch.lib.check_output('ss -tuplnH').splitlines()
@@ -154,15 +154,15 @@ def _tail(name, proc, callback):
     sys.exit(1)
 
 def _load_existing_pids():
-    xs = opensnitch.lib.check_output('ps -ef | sed 1d').splitlines()
-    xs = (x.split(None, 7) for x in xs)
-    xs = ((pid, path) for uid, pid, ppid, c, stime, tty, time, path in xs)
+    xs = opensnitch.lib.check_output('ps -eo pid,args --no-heading').splitlines()
+    xs = (x.split(None, 1) for x in xs)
     xs = ((pid, path) for pid, path in xs if not path.startswith('['))
     for pid, path in xs:
         path, *args = path.split()
-        if '/' not in path:
+        if '/' not in path: # resolve any non-absolute paths
             try:
                 path = opensnitch.lib.check_output(f'sudo ls -l /proc/{pid}/exe 2>/dev/null').split(' -> ')[-1]
             except subprocess.CalledProcessError:
                 pass
+        print('DEBUG: load existing pid:', pid, path, *args)
         _cb_execve(pid, path, *args)
