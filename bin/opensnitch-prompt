@@ -20,7 +20,7 @@ class MainWindow(QtWidgets.QMainWindow):
         palette = self.palette()
         palette.setColor(self.backgroundRole(), QColor(20, 20, 20))
         self.setPalette(palette)
-        self.setStyleSheet("QLabel { font: 14pt Mono; color: rgb(200,200,200); }")
+        self.setStyleSheet("QLabel { font: 28pt Mono; color: rgb(200,200,200); }")
         self.title = QtWidgets.QLabel('', self)
         self.title.setAlignment(QtCore.Qt.AlignCenter)
         gridLayout.addWidget(self.title, 0, 0)
@@ -33,6 +33,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.action = 'no'
         self.help = False
         self.text = ' '.join(words).replace('<', '&lt;').replace('>', '&gt;').split('|')
+        self.seconds = 60
+        self.timer = QtCore.QTimer()
+        self.timer.setInterval(1000)
+        self.timer.timeout.connect(self.tick)
+        self.timer.start()
+        self.update()
+
+    def tick(self):
+        self.seconds -= 1
+        if self.seconds == 0:
+            self.exit()
         self.update()
 
     def keyPressEvent(self, event, **kw):
@@ -94,7 +105,7 @@ class MainWindow(QtWidgets.QMainWindow):
             args = yellow(args.strip())
         text = [proto, ' '.join([src, arrow, dst]), ' '.join([pid, path]), args]
         text = '\n\n'.join(text)
-        self.title.setText(f'<span/>{text}\n\n{"-" * 250}\n\n{self.duration} {self.scope} {self.granularity}\n\n(y)es (n)o (h)elp'.replace('\n', '<br/>'))
+        self.title.setText(f'<span/>{text}\n\n{"-" * 250}\n\n{self.duration} {self.scope} {self.granularity}\n\n(y)es (n)o (h)elp\n\n{"-" * 250}\n\n{self.seconds} seconds until DENY'.replace('\n', '<br/>'))
 
     def exit(self):
         self.update()
