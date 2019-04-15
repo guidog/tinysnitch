@@ -1,4 +1,4 @@
-# This file is part of OpenSnitch.
+# This file is part of tinysnitch, formerly known as OpenSnitch.
 #
 # Copyright(c) 2019 Nathan Todd-Stone
 # me@nathants.com
@@ -17,14 +17,14 @@
 # or write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
-from opensnitch.lib import log
+from tinysnitch.lib import log
 
 try:
-    from opensnitch._netfilter import ffi, lib
+    from tinysnitch._netfilter import ffi, lib
     log('use existing ffi binaries')
 except ModuleNotFoundError:
     log('recompile ffi binaries')
-    import opensnitch.netfilter_build
+    import tinysnitch.netfilter_build
     import os
     orig = os.getcwd()
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -32,14 +32,14 @@ except ModuleNotFoundError:
     for path in os.listdir('.'):
         if path.endswith('.c') or path.endswith('.o') or path.endswith('.so'):
             os.remove(path)
-    opensnitch.netfilter_build.ffibuilder.compile(verbose=True)
+    tinysnitch.netfilter_build.ffibuilder.compile(verbose=True)
     os.chdir(orig)
-    from opensnitch._netfilter import ffi, lib
+    from tinysnitch._netfilter import ffi, lib
 
-import opensnitch.dns
-import opensnitch.lib
-import opensnitch.rules
-import opensnitch.trace
+import tinysnitch.dns
+import tinysnitch.lib
+import tinysnitch.rules
+import tinysnitch.trace
 import scapy.layers.inet
 import time
 
@@ -86,44 +86,44 @@ def destroy(nfq_q_handle, nfq_handle):
 
 def _finalize(nfq, id, data, size, orig_conn, action, conn):
     _src, _dst, _src_port, _dst_port, proto, _pid, _path, _args = conn
-    if not opensnitch.dns.is_inbound_dns(*conn) and proto in opensnitch.lib.protos:
-        log(f'INFO {action} {opensnitch.dns.format(*conn)}')
+    if not tinysnitch.dns.is_inbound_dns(*conn) and proto in tinysnitch.lib.protos:
+        log(f'INFO {action} {tinysnitch.dns.format(*conn)}')
     if action == 'allow':
         lib.nfq_set_verdict(nfq, id, ONE, ZERO, NULL)
     elif action == 'deny':
         lib.nfq_set_verdict2(nfq, id, ONE, MARK, size, data)
     else:
         assert False, f'bad action: {action}'
-    opensnitch.trace.rm_conn(*orig_conn)
+    tinysnitch.trace.rm_conn(*orig_conn)
 
 @ffi.def_extern()
 def _py_callback(id, data, size):
     unpacked = bytes(ffi.unpack(data, size))
     packet = scapy.layers.inet.IP(unpacked)
-    opensnitch.dns.update_hosts(packet)
-    conn = opensnitch.lib.conn(packet)
+    tinysnitch.dns.update_hosts(packet)
+    conn = tinysnitch.lib.conn(packet)
     finalize = lambda action, new_conn: _finalize(state._nfq_q_handle, id, data, size, conn, action, new_conn)
-    resolved_conn = opensnitch.dns.resolve(*conn)
+    resolved_conn = tinysnitch.dns.resolve(*conn)
 
     # the fastest rule types dont require pid/path/args
-    rule = opensnitch.rules.match_rule(*resolved_conn)
+    rule = tinysnitch.rules.match_rule(*resolved_conn)
     if rule:
         action, _duration, _start = rule
         finalize(action, resolved_conn)
 
     # auto allow and dont double print dns packets, the only ones we track after --ctstate NEW, so that we can log the solved addr
-    elif opensnitch.dns.is_inbound_dns(*conn):
+    elif tinysnitch.dns.is_inbound_dns(*conn):
         finalize('allow', conn)
 
     else:
         # make a single attempt to add meta
         try:
-            conn = opensnitch.trace.add_meta(*conn)
+            conn = tinysnitch.trace.add_meta(*conn)
 
         # otherwise enqueue for delayed processing
         except KeyError:
-            opensnitch.rules.enqueue(finalize, conn)
+            tinysnitch.rules.enqueue(finalize, conn)
 
         # on good meta lookup, process inline
         else:
-            opensnitch.rules.check(finalize, conn)
+            tinysnitch.rules.check(finalize, conn)

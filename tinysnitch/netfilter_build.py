@@ -1,4 +1,4 @@
-# This file is part of OpenSnitch.
+# This file is part of tinysnitch, formerly known as OpenSnitch.
 #
 # Copyright(c) 2019 Nathan Todd-Stone
 # me@nathants.com
@@ -21,7 +21,7 @@
 # or write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
-# based on: https://github.com/evilsocket/opensnitch/blob/5c8f7102c29caf94e967f8433a68b861a4b1666f/daemon/netfilter/queue.h
+# based on: https://github.com/evilsocket/tinysnitch/blob/5c8f7102c29caf94e967f8433a68b861a4b1666f/daemon/netfilter/queue.h
 
 from cffi import FFI
 ffibuilder = FFI()

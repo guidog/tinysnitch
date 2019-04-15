@@ -1,5 +1,0 @@
-#!/usr/bin/env pypy3
-import opensnitch
-import argh
-
-argh.dispatch_command(opensnitch.main)

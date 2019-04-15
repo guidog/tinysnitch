@@ -1,4 +1,4 @@
-# This file is part of OpenSnitch.
+# This file is part of tinysnitch, formerly known as OpenSnitch.
 #
 # Copyright(c) 2019 Nathan Todd-Stone
 # me@nathants.com
@@ -23,12 +23,12 @@
 
 import sys
 import time
-import opensnitch.lib
+import tinysnitch.lib
 from scapy.layers.dns import DNS
 from scapy.layers.inet import UDP
-from opensnitch.lib import log
+from tinysnitch.lib import log
 
-_hosts_file = '/etc/opensnitch.hosts'
+_hosts_file = '/etc/tinysnitch.hosts'
 
 class state:
     _localhosts = set()
@@ -37,8 +37,8 @@ class state:
 
 def start():
     _populate_hosts()
-    opensnitch.lib.run_thread(_populate_localhosts)
-    opensnitch.lib.run_thread(_persister)
+    tinysnitch.lib.run_thread(_populate_localhosts)
+    tinysnitch.lib.run_thread(_persister)
 
 def format(src, dst, src_port, dst_port, proto, pid, path, args):
     return f'{proto} | {src}:{src_port} -> {dst}:{dst_port} | {pid} {path} | {args}'
@@ -76,7 +76,7 @@ def _populate_hosts():
 
 def _populate_localhosts():
     while True:
-        for line in opensnitch.lib.check_output('ip a | grep inet').splitlines() + ['- localhost -']:
+        for line in tinysnitch.lib.check_output('ip a | grep inet').splitlines() + ['- localhost -']:
             _, addr, *_ = line.strip().split()
             addr = addr.split('/')[0]
             state._hosts[addr] = 'localhost'
@@ -89,11 +89,11 @@ def _parse_dns(packet):
     udp = packet['UDP']
     dns = packet['DNS']
     if int(udp.dport) == 53:
-        yield opensnitch.lib.decode(dns.qd.qname), None
+        yield tinysnitch.lib.decode(dns.qd.qname), None
     elif int(udp.sport) == 53:
         for i in range(dns.ancount):
             dnsrr = dns.an[i]
-            yield opensnitch.lib.decode(dnsrr.rrname), opensnitch.lib.decode(dnsrr.rdata)
+            yield tinysnitch.lib.decode(dnsrr.rrname), tinysnitch.lib.decode(dnsrr.rdata)
 
 def get_hostname(address):
     return state._hosts.get(address, address)

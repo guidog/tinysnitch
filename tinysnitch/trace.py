@@ -1,4 +1,4 @@
-# This file is part of OpenSnitch.
+# This file is part of tinysnitch, formerly known as OpenSnitch.
 #
 # Copyright(c) 2019 Nathan Todd-Stone
 # me@nathants.com
@@ -18,13 +18,13 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
 import time
-import opensnitch.lib
+import tinysnitch.lib
 import subprocess
 import sys
 import threading
 import time
 import queue
-from opensnitch.lib import log
+from tinysnitch.lib import log
 
 class state:
     _lock = threading.RLock()
@@ -36,16 +36,16 @@ class state:
 
 def start():
     _load_existing_pids()
-    opensnitch.lib.run_thread(_gc)
-    _pairs = [('opensnitch-bpftrace-tcp', _cb_tcp_udp),
-              ('opensnitch-bpftrace-udp', _cb_tcp_udp),
-              ('opensnitch-bpftrace-fork', _cb_fork),
-              ('opensnitch-bpftrace-exit', _cb_exit),
-              ('opensnitch-bcc-execve', _cb_execve)]
+    tinysnitch.lib.run_thread(_gc)
+    _pairs = [('tinysnitch-bpftrace-tcp', _cb_tcp_udp),
+              ('tinysnitch-bpftrace-udp', _cb_tcp_udp),
+              ('tinysnitch-bpftrace-fork', _cb_fork),
+              ('tinysnitch-bpftrace-exit', _cb_exit),
+              ('tinysnitch-bcc-execve', _cb_execve)]
     for program, cb in _pairs:
         proc = subprocess.Popen(['stdbuf', '-o0', program], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        opensnitch.lib.run_thread(opensnitch.lib.monitor, proc)
-        opensnitch.lib.run_thread(_tail, program, proc, cb)
+        tinysnitch.lib.run_thread(tinysnitch.lib.monitor, proc)
+        tinysnitch.lib.run_thread(_tail, program, proc, cb)
 
 def rm_conn(src, dst, src_port, dst_port, _proto, _pid, _path, _args):
     state._gc_queue.put((src, src_port, dst, dst_port, time.monotonic()))
@@ -54,7 +54,7 @@ def is_alive(_src, _dst, _src_port, _dst_port, _proto, pid, _path, _args):
     return pid == '-' or pid in state._pids
 
 def online_meta_lookup(src, dst, src_port, dst_port, proto, pid, path, args):
-    xs = opensnitch.lib.check_output('ss -tupnH').splitlines()
+    xs = tinysnitch.lib.check_output('ss -tupnH').splitlines()
     for x in xs:
         try:
             _proto, _state, _, _, _src, _dst, _program = x.split()
@@ -64,7 +64,7 @@ def online_meta_lookup(src, dst, src_port, dst_port, proto, pid, path, args):
             if f'{src}:{src_port}' == _src and f'{dst}:{dst_port}' == _dst:
                 pid = _program.split('pid=')[-1].split(',')[0]
                 try:
-                    path, *args = opensnitch.lib.check_output('ps --no-heading -o args', pid).split()
+                    path, *args = tinysnitch.lib.check_output('ps --no-heading -o args', pid).split()
                     args = ' '.join(args)
                 except subprocess.CalledProcessError:
                     pass # the pid could be gone by ps time
@@ -74,7 +74,7 @@ def _listening_conns():
     acquired = state._listening_lock.acquire(blocking=False) # only run one of these a time, the others just immediately exit
     if acquired:
         try:
-            xs = opensnitch.lib.check_output('ss -tuplnH').splitlines()
+            xs = tinysnitch.lib.check_output('ss -tuplnH').splitlines()
             for x in xs:
                 try:
                     _proto, _state, _, _, src, dst, program = x.split()
@@ -89,14 +89,14 @@ def _listening_conns():
 
 def add_meta(src, dst, src_port, dst_port, proto, pid, path, args):
     # note: meta data has to happen on un-resolved src/dst addresses, ie ipv4 addresses
-    if proto in opensnitch.lib.protos:
-        if opensnitch.dns.is_localhost(dst):
+    if proto in tinysnitch.lib.protos:
+        if tinysnitch.dns.is_localhost(dst):
             try:
                 with state._lock:
                     pid = state._listening_conns[dst_port]
                     path, args = state._pids[pid]
             except KeyError:
-                opensnitch.lib.run_thread(_listening_conns) # if we miss on a listening server, lookup all listening pids
+                tinysnitch.lib.run_thread(_listening_conns) # if we miss on a listening server, lookup all listening pids
                 raise
         else:
             with state._lock:
@@ -154,14 +154,14 @@ def _tail(name, proc, callback):
     sys.exit(1)
 
 def _load_existing_pids():
-    xs = opensnitch.lib.check_output('ps -eo pid,args --no-heading').splitlines()
+    xs = tinysnitch.lib.check_output('ps -eo pid,args --no-heading').splitlines()
     xs = (x.split(None, 1) for x in xs)
     xs = ((pid, path) for pid, path in xs if not path.startswith('['))
     for pid, path in xs:
         path, *args = path.split()
         if '/' not in path: # resolve any non-absolute paths
             try:
-                path = opensnitch.lib.check_output(f'sudo ls -l /proc/{pid}/exe 2>/dev/null').split(' -> ')[-1]
+                path = tinysnitch.lib.check_output(f'sudo ls -l /proc/{pid}/exe 2>/dev/null').split(' -> ')[-1]
             except subprocess.CalledProcessError:
                 pass
         print('DEBUG: load existing pid:', pid, path, *args)

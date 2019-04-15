@@ -37,14 +37,14 @@ def watch(root, callback=None, skips=_watch_skips, sleep=.1):
         time.sleep(sleep)
 
 def kill_children():
-    c('kill \$(ps -ef | grep \'bin/opensnitch-\' | grep -v grep | awk \'{print \$2}\') &>/dev/null')
+    c('kill \$(ps -ef | grep \'bin/tinysnitch-\' | grep -v grep | awk \'{print \$2}\') &>/dev/null')
 
 def restart():
     if hasattr(restart, 'proc'):
         restart.proc.terminate()
     cc('find -type f | grep -E \"\.c$|\.o$|\.so$\" | xargs rm -fv')
     kill_children()
-    restart.proc = subprocess.Popen('pypy-ipython -ic \'from opensnitch import rules, trace, dns; import opensnitch, threading; t = threading.Thread(target=opensnitch.main); t.daemon = True; t.start()\'', shell=True)
+    restart.proc = subprocess.Popen('pypy-ipython -ic \'from tinysnitch import rules, trace, dns; import tinysnitch, threading; t = threading.Thread(target=tinysnitch.main); t.daemon = True; t.start()\'', shell=True)
 
 import atexit
 @atexit.register

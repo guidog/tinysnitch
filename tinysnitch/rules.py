@@ -1,4 +1,4 @@
-# This file is part of OpenSnitch.
+# This file is part of tinysnitch, formerly known as OpenSnitch.
 #
 # Copyright(c) 2019 Nathan Todd-Stone
 # me@nathants.com
@@ -18,18 +18,18 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
 import traceback
-import opensnitch.lib
-import opensnitch.trace
+import tinysnitch.lib
+import tinysnitch.trace
 import os
 import queue
 import sys
 import time
-from opensnitch.lib import log
+from tinysnitch.lib import log
 
-assert '1' == opensnitch.lib.check_output('ls /home | wc -l') or 'prompt_user' in os.environ, 'in a multi-user environment please specify the user to display X11 prompts as via env variable $prompt_user'
-_prompt_user = os.environ.get('prompt_user', opensnitch.lib.check_output('ls /home | head -n1'))
+assert '1' == tinysnitch.lib.check_output('ls /home | wc -l') or 'prompt_user' in os.environ, 'in a multi-user environment please specify the user to display X11 prompts as via env variable $prompt_user'
+_prompt_user = os.environ.get('prompt_user', tinysnitch.lib.check_output('ls /home | head -n1'))
 _actions = {'allow', 'deny'}
-_rules_file = '/etc/opensnitch.rules'
+_rules_file = '/etc/tinysnitch.rules'
 
 class state:
     _rules = {}
@@ -40,18 +40,18 @@ class state:
 
 def start():
     _load_permanent_rules()
-    opensnitch.lib.run_thread(_gc)
-    opensnitch.lib.run_thread(_process_queue)
-    opensnitch.lib.run_thread(_process_delay_queue)
-    opensnitch.lib.run_thread(_process_prompt_queue)
-    opensnitch.lib.run_thread(_process_online_meta_lookups_queue)
+    tinysnitch.lib.run_thread(_gc)
+    tinysnitch.lib.run_thread(_process_queue)
+    tinysnitch.lib.run_thread(_process_delay_queue)
+    tinysnitch.lib.run_thread(_process_prompt_queue)
+    tinysnitch.lib.run_thread(_process_online_meta_lookups_queue)
 
 def enqueue(finalize, conn):
     repeats = 0
     state._queue.put((finalize, conn, repeats))
 
 def match_rule(_src, dst, _src_port, dst_port, proto, _pid, path, args):
-    if proto not in opensnitch.lib.protos:
+    if proto not in tinysnitch.lib.protos:
         return 'allow', None, None # allow all non tcp/udp
     else:
         keys = [(dst, dst_port, proto, path, args), # addr, port, path, args
@@ -78,13 +78,13 @@ def to_src_conn(src, dst, src_port, dst_port, proto, pid, path, args):
     return src, dst, src_port, dst_port, proto, pid, path, args
 
 def check(finalize, conn):
-    conn = opensnitch.dns.resolve(*conn)
+    conn = tinysnitch.dns.resolve(*conn)
     _src, dst, _src_port, _dst_port, _proto, _pid, _path, _args = conn
     # when the destination is localhost, two rules are required. one to allow
     # that localhost destination, and a second to allow the inbound request
     # based on the remote src. ie you can allow localhost 8000 independently of
     # allowing a remote ipv4 to hit localhost 8000.
-    if opensnitch.dns.is_localhost(dst):
+    if tinysnitch.dns.is_localhost(dst):
         dst_rule = match_rule(*conn)
         if dst_rule:
             action, _duration, _start = dst_rule
@@ -134,13 +134,13 @@ def _process_queue():
         finalize, conn, repeats = state._queue.get()
         try:
             assert repeats < 100 # TODO instead of polling should we react to trace events?, tbh this is prob fine
-            conn = opensnitch.trace.add_meta(*conn)
+            conn = tinysnitch.trace.add_meta(*conn)
             if repeats:
-                log(f'DEBUG resolved meta after spinning {repeats} times for {opensnitch.dns.format(*conn)}')
+                log(f'DEBUG resolved meta after spinning {repeats} times for {tinysnitch.dns.format(*conn)}')
         except KeyError:
             state._delay_queue.put((finalize, conn, repeats + 1))
         except AssertionError:
-            log(f'DEBUG fallback to online meta lookup for {opensnitch.dns.format(*conn)}')
+            log(f'DEBUG fallback to online meta lookup for {tinysnitch.dns.format(*conn)}')
             state._online_meta_lookup_queue.put((finalize, conn))
         else:
             check(finalize, conn)
@@ -168,9 +168,9 @@ def _parse_rule(line):
         log(f'ERROR invalid rule {line}')
         log(f'ERROR ports should be numbers, was {dst_port}')
         return
-    if proto not in opensnitch.lib.protos:
+    if proto not in tinysnitch.lib.protos:
         log(f'ERROR invalid rule {line}')
-        log(f'ERROR bad proto, should be one of {opensnitch.lib.protos}, was {proto}')
+        log(f'ERROR bad proto, should be one of {tinysnitch.lib.protos}, was {proto}')
         return
     if action not in _actions:
         log(f'ERROR invalid rule {line}')
@@ -204,9 +204,9 @@ def _process_prompt_queue():
     while True:
         finalize, conn = state._prompt_queue.get()
         _src, dst, _src_port, _dst_port, _proto, _pid, _path, _args = conn
-        if not opensnitch.trace.is_alive(*conn):
+        if not tinysnitch.trace.is_alive(*conn):
             finalize('deny', conn)
-        elif opensnitch.dns.is_localhost(dst):
+        elif tinysnitch.dns.is_localhost(dst):
             dst_rule = match_rule(*conn)
             if dst_rule:
                 action, _duration, _start = dst_rule
@@ -215,9 +215,9 @@ def _process_prompt_queue():
                     continue
             else:
                 try:
-                    duration, scope, action, granularity = opensnitch.lib.check_output(f'sudo su {_prompt_user} -c \'DISPLAY=:0 opensnitch-prompt "{opensnitch.dns.format(*conn)}"\' 2>/dev/null').split()
+                    duration, scope, action, granularity = tinysnitch.lib.check_output(f'sudo su {_prompt_user} -c \'DISPLAY=:0 tinysnitch-prompt "{tinysnitch.dns.format(*conn)}"\' 2>/dev/null').split()
                 except:
-                    log('ERROR failed run opensnitch-prompt')
+                    log('ERROR failed run tinysnitch-prompt')
                     return finalize('deny', conn)
                 else:
                     action = _process_rule(conn, duration, scope, action, granularity)
@@ -226,7 +226,7 @@ def _process_prompt_queue():
                         continue
             src_conn = to_src_conn(*conn)
             try:
-                src_conn = opensnitch.trace.add_meta(*src_conn)
+                src_conn = tinysnitch.trace.add_meta(*src_conn)
             except KeyError:
                 pass # best effort to show client program for localhost src-conn
             src_rule = match_rule(*src_conn)
@@ -236,9 +236,9 @@ def _process_prompt_queue():
                     finalize('deny', src_conn)
             else:
                 try:
-                    duration, scope, action, granularity = opensnitch.lib.check_output(f'sudo su {_prompt_user} -c \'DISPLAY=:0 opensnitch-prompt "{opensnitch.dns.format(*to_src_proto(*conn))}"\' 2>/dev/null').split()
+                    duration, scope, action, granularity = tinysnitch.lib.check_output(f'sudo su {_prompt_user} -c \'DISPLAY=:0 tinysnitch-prompt "{tinysnitch.dns.format(*to_src_proto(*conn))}"\' 2>/dev/null').split()
                 except:
-                    log('ERROR failed run opensnitch-prompt')
+                    log('ERROR failed run tinysnitch-prompt')
                     finalize('deny', src_conn)
                     continue
                 else:
@@ -254,9 +254,9 @@ def _process_prompt_queue():
                 finalize(action, conn)
             else:
                 try:
-                    duration, scope, action, granularity = opensnitch.lib.check_output(f'sudo su {_prompt_user} -c \'DISPLAY=:0 opensnitch-prompt "{opensnitch.dns.format(*conn)}"\' 2>/dev/null').split()
+                    duration, scope, action, granularity = tinysnitch.lib.check_output(f'sudo su {_prompt_user} -c \'DISPLAY=:0 tinysnitch-prompt "{tinysnitch.dns.format(*conn)}"\' 2>/dev/null').split()
                 except:
-                    log('ERROR failed run opensnitch-prompt')
+                    log('ERROR failed run tinysnitch-prompt')
                     finalize('deny', conn)
                 else:
                     action = _process_rule(conn, duration, scope, action, granularity)
@@ -267,7 +267,7 @@ def _process_prompt_queue():
 def _process_online_meta_lookups_queue():
     while True:
         finalize, conn = state._online_meta_lookup_queue.get()
-        conn = opensnitch.trace.online_meta_lookup(*conn)
+        conn = tinysnitch.trace.online_meta_lookup(*conn)
         check(finalize, conn)
     log('FATAL process-online-meta-lookups-queue exited prematurely')
     sys.exit(1)
