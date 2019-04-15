@@ -32,7 +32,7 @@ class state:
     _listening_lock = threading.RLock()
     _listening_conns = {} # {port: pid}
     _conns = {} # {(src, src_port, dst, dst_port): pid}
-    _cleanup_queue = queue.Queue(1024 * 1024)
+    _gc_queue = queue.Queue(1024 * 1024)
 
 def start():
     _load_existing_pids()
@@ -48,7 +48,7 @@ def start():
         opensnitch.lib.run_thread(_tail, program, proc, cb)
 
 def rm_conn(src, dst, src_port, dst_port, _proto, _pid, _path, _args):
-    state._cleanup_queue.put((src, src_port, dst, dst_port, time.monotonic()))
+    state._gc_queue.put((src, src_port, dst, dst_port, time.monotonic()))
 
 def is_alive(_src, _dst, _src_port, _dst_port, _proto, pid, _path, _args):
     return pid == '-' or pid in state._pids
@@ -125,12 +125,12 @@ def _gc():
     grace_seconds = 5 # TODO ideal value?
     while True:
         now = time.monotonic()
-        for _ in range(state._cleanup_queue.qsize()):
-            src, src_port, dst, dst_port, start = state._cleanup_queue.get()
+        for _ in range(state._gc_queue.qsize()):
+            src, src_port, dst, dst_port, start = state._gc_queue.get()
             if now - start > grace_seconds: # sometimes dns request reuse the same port, so a grace period before cleanup
                 state._conns.pop((src, src_port, dst, dst_port), None)
             else:
-                state._cleanup_queue.put((src, src_port, dst, dst_port, start))
+                state._gc_queue.put((src, src_port, dst, dst_port, start))
         time.sleep(grace_seconds)
     log('ERROR trace gc exited prematurely')
     sys.exit(1)
