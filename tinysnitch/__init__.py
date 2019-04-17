@@ -45,7 +45,8 @@ def _log_sizes():
     log('FATAL log sizes exited prematurely')
     sys.exit(1)
 
-def main(setup_firewall=False, teardown_firewall=False, log_sizes=False):
+def main(setup_firewall=False, teardown_firewall=False, log_sizes=False, rules='/etc/tinysnitch.rules'):
+    tinysnitch.rules.state.rules_file = rules
     if setup_firewall:
         for rule in _iptables_rules:
             tinysnitch.lib.check_call('iptables -I', rule)

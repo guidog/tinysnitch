@@ -26,12 +26,13 @@ import sys
 import time
 from tinysnitch.lib import log
 
-assert '1' == tinysnitch.lib.check_output('ls /home | wc -l') or 'prompt_user' in os.environ, 'in a multi-user environment please specify the user to display X11 prompts as via env variable $prompt_user'
-_prompt_user = os.environ.get('prompt_user', tinysnitch.lib.check_output('ls /home | head -n1'))
+assert '1' == tinysnitch.lib.check_output('ls /home | wc -l') or 'TINYSNITCH_PROMPT_USER' in os.environ, 'in a multi-user environment please specify the user to display X11 prompts as via env variable $TINYSNITCH_PROMPT_USER'
+_prompt_user = os.environ.get('TINYSNITCH_PROMPT_USER', tinysnitch.lib.check_output('ls /home | head -n1'))
 _actions = {'allow', 'deny'}
-_rules_file = '/etc/tinysnitch.rules'
+
 
 class state:
+    rules_file = None
     _rules = {}
     _queue = queue.Queue(1024)
     _online_meta_lookup_queue = queue.Queue(1024)
@@ -180,10 +181,10 @@ def _parse_rule(line):
 
 def _load_permanent_rules():
     try:
-        with open(_rules_file) as f:
+        with open(state.rules_file) as f:
             lines = reversed(f.read().splitlines()) # lines at top of file are higher priority
     except FileNotFoundError:
-        with open(_rules_file, 'w') as f:
+        with open(state.rules_file, 'w') as f:
             lines = []
     i = 0
     lines = [l.split('#')[-1] for l in lines]
@@ -196,7 +197,7 @@ def _load_permanent_rules():
             _add_rule(action, duration, start, dst, dst_port, proto, path, args)
             log(f'INFO loaded rule {action} {dst} {dst_port} {proto} {path} {args}')
     if list(lines):
-        log(f'INFO loaded {i + 1} rules from {_rules_file}')
+        log(f'INFO loaded {i + 1} rules from {state.rules_file}')
 
 def _process_prompt_queue():
     # we match rule again here in case a rule was added while this conn was
@@ -293,7 +294,7 @@ def _process_rule(conn, duration, scope, action, granularity):
         start = time.monotonic()
         _add_rule(action, duration, start, dst, dst_port, proto, path, args)
         if duration is None:
-            with open(_rules_file, 'a') as f:
+            with open(state.rules_file, 'a') as f:
                 f.write(f'{action} {dst} {dst_port} {proto} {path} {args}\n')
             log(f'INFO add permanent rule {action} {dst} {dst_port} {proto} {path} {args}')
         else:
