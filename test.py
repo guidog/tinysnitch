@@ -33,7 +33,7 @@ def teardown_function():
 def logs():
     xs = co(f'cat {log_file} | grep -e "INFO allow" -e "INFO deny"').splitlines()
     xs = [x.split(' INFO ')[-1].replace('->', '').replace('|', ' ').split(None, 6) for x in xs]
-    xs = [(action, proto, dst, program, args) for action, proto, src, dst, pid, program, args in xs]
+    xs = [' '.join((action, proto, dst, program, args)) for action, proto, src, dst, pid, program, args in xs]
     return xs
 
 def run(*rules):
@@ -46,13 +46,13 @@ def test_allow():
     run('allow 1.1.1.1    53 udp /usr/bin/curl -',
         'allow google.com 80 tcp /usr/bin/curl -')
     assert co('curl -v google.com 2>&1 | grep "^< HTTP"') == '< HTTP/1.1 301 Moved Permanently'
-    assert logs() == [('allow', 'udp', '1.1.1.1:53', '/usr/bin/curl', '-v google.com'),
-                      ('allow', 'udp', '1.1.1.1:53', '/usr/bin/curl', '-v google.com'),
-                      ('allow', 'tcp', 'google.com:80', '/usr/bin/curl', '-v google.com')]
+    assert logs() == ['allow udp 1.1.1.1:53 /usr/bin/curl -v google.com',
+                      'allow udp 1.1.1.1:53 /usr/bin/curl -v google.com',
+                      'allow tcp google.com:80 /usr/bin/curl -v google.com']
 
 def test_deny():
-    run('deny 1.1.1.1    53 udp /usr/bin/curl -')
+    run('deny 1.1.1.1 53 udp /usr/bin/curl -')
     with pytest.raises(subprocess.CalledProcessError):
         cc('curl -v google.com')
-    assert logs() == [('deny', 'udp', '1.1.1.1:53', '/usr/bin/curl', '-v google.com'),
-                      ('deny', 'udp', '1.1.1.1:53', '/usr/bin/curl', '-v google.com')]
+    assert logs() == ['deny udp 1.1.1.1:53 /usr/bin/curl -v google.com',
+                      'deny udp 1.1.1.1:53 /usr/bin/curl -v google.com']
