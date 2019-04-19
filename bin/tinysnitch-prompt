@@ -27,7 +27,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def __init__(self, words):
         self.qt_setup()
-        self.duration = 'once'
+        self.duration = '1-minute'
         self.granularity = 'args-and-path'
         self.scope = 'port-domain'
         self.action = 'no'
