@@ -91,7 +91,7 @@ class MainWindow(QtWidgets.QMainWindow):
             text = '\n\n'.join(['protocol', ' '.join(['src:port', '->', 'dst:port']), ' '.join(['pid', 'program']), 'args'])
             self.title.setText(f'<span/>{text}\n\n{"-" * 250}\n\nduration scope granularity\n\n(y)es (n)o (h)elp (l)egend\n\n{"-" * 250}\n\n{self.seconds} seconds until DENY'.replace('\n', '<br/>'))
         else:
-            yellow = lambda x: f'<span style="color: rgb(220, 220, 0);">[{x}]</span>'
+            yellow = lambda x: '-' if x == '-' else f'<span style="color: rgb(220, 220, 0);">[{x}]</span>'
             proto, target, pid, args = self.text
             src, arrow, dst = target.split()
             if proto.strip().endswith('-src'):
