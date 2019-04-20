@@ -65,6 +65,7 @@ def online_meta_lookup(src, dst, src_port, dst_port, proto, pid, path, args):
                 pid = _program.split('pid=')[-1].split(',')[0]
                 try:
                     path, *args = tinysnitch.lib.check_output('ps --no-heading -o args', pid).split()
+                    path = _resolve_relative_path(pid, path)
                     args = ' '.join(args)
                 except subprocess.CalledProcessError:
                     pass # the pid could be gone by ps time
@@ -153,16 +154,20 @@ def _tail(name, proc, callback):
     log(f'FATAL tail {name} exited prematurely')
     sys.exit(1)
 
+def _resolve_relative_path(pid, path):
+    if '/' not in path:
+        try:
+            path = tinysnitch.lib.check_output(f'sudo ls -l /proc/{pid}/exe 2>/dev/null').split(' -> ')[-1]
+        except subprocess.CalledProcessError:
+            pass
+    return path
+
 def _load_existing_pids():
     xs = tinysnitch.lib.check_output('ps -eo pid,args --no-heading').splitlines()
     xs = (x.split(None, 1) for x in xs)
     xs = ((pid, path) for pid, path in xs if not path.startswith('['))
     for pid, path in xs:
         path, *args = path.split()
-        if '/' not in path: # resolve any non-absolute paths
-            try:
-                path = tinysnitch.lib.check_output(f'sudo ls -l /proc/{pid}/exe 2>/dev/null').split(' -> ')[-1]
-            except subprocess.CalledProcessError:
-                pass
+        path = _resolve_relative_path(pid, path)
         print('DEBUG: load existing pid:', pid, path, *args)
         _cb_execve(pid, path, *args)
