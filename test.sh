@@ -1,2 +1,2 @@
 #!/bin/bash
-py.test -svx --tb native tests.py
+py.test -svx --tb native test.py
