@@ -9,27 +9,6 @@ rules_file = co('mktemp')
 log_file = co('mktemp')
 os.environ['TINYSNITCH_RULES'] = rules_file
 
-def setup_function():
-    assert co('sudo whoami') == 'root'
-    assert co('sudo iptables-save | grep -v -e "^#" -e "^:"').splitlines() == [
-        '*mangle',
-        '-A INPUT -m conntrack --ctstate NEW -j NFQUEUE --queue-num 0',
-        '-A OUTPUT -m conntrack --ctstate NEW -j NFQUEUE --queue-num 0',
-        'COMMIT',
-        '*filter',
-        '-A INPUT -m mark --mark 0x18ba5 -j REJECT --reject-with icmp-port-unreachable',
-        '-A INPUT -p udp -m udp --sport 53 -j NFQUEUE --queue-num 0',
-        '-A OUTPUT -m mark --mark 0x18ba5 -j REJECT --reject-with icmp-port-unreachable',
-        'COMMIT',
-        '*nat',
-        'COMMIT',
-    ]
-    assert co('ps -ef | grep tinysnitch | grep -v -e test -e grep | wc -l') == '0'
-
-def teardown_function():
-    pids = [x.split()[1] for x in co('ps -ef|grep tinysnitch').splitlines()]
-    cc('sudo kill', *pids, '&>/dev/null || true')
-
 def logs():
     xs = co(f'cat {log_file} | grep -e "INFO allow" -e "INFO deny"').splitlines()
     xs = [x.split(' INFO ')[-1].replace('->', '').replace('|', ' ').split(None, 6) for x in xs]
@@ -41,6 +20,17 @@ def run(*rules):
     for rule in rules:
         co('echo', rule, '>>', rules_file)
     cc(f'(sudo tinysnitchd --rules {rules_file} 2>&1 | tee {log_file}) &')
+
+def setup_module():
+    assert co('sudo whoami') == 'root'
+    cc('tinysnitch-iptables-add')
+
+def setup_function():
+    assert co('ps -ef | grep tinysnitch | grep -v -e test -e grep | wc -l') == '0'
+
+def teardown_function():
+    pids = [x.split()[1] for x in co('ps -ef|grep tinysnitch').splitlines()]
+    cc('sudo kill', *pids, '&>/dev/null || true')
 
 def test_outbound_allow():
     run('allow 1.1.1.1 53 udp /usr/bin/curl -',
