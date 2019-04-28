@@ -22,17 +22,10 @@ import tinysnitch.lib
 import tinysnitch.netfilter
 import tinysnitch.rules
 import tinysnitch.trace
+import os
 import sys
 import time
 from tinysnitch.lib import log
-
-_iptables_rules = [
-    "INPUT --protocol udp --sport 53 -j NFQUEUE --queue-num 0",             # catch dns packets on the way back in so we can read the resolved address
-    "OUTPUT -t mangle -m conntrack --ctstate NEW -j NFQUEUE --queue-num 0", # potentially block incoming traffic
-    "INPUT -t mangle -m conntrack --ctstate NEW -j NFQUEUE --queue-num 0",  # potentially block outgoing traffic
-    "INPUT -m mark --mark 101285 -j REJECT",                                # inbound rejection mark
-    "OUTPUT -m mark --mark 101285 -j REJECT",                               # outbound rejection mark
-]
 
 assert tinysnitch.lib.check_output('whoami') == 'root', 'tinysnitchd must run as root'
 
@@ -45,30 +38,23 @@ def _log_sizes():
     log('FATAL log sizes exited prematurely')
     sys.exit(1)
 
-def main(setup_firewall=False, teardown_firewall=False, log_sizes=False, rules='/etc/tinysnitch.rules'):
+def main(rules='/etc/tinysnitch.rules'):
     tinysnitch.rules.state.rules_file = rules
-    if setup_firewall:
-        for rule in _iptables_rules:
-            tinysnitch.lib.check_call('iptables -I', rule)
-    elif teardown_firewall:
-        for rule in _iptables_rules:
-            tinysnitch.lib.check_call('iptables -D', rule, '|| echo failed to delete:', rule)
-    else:
-        trace_pids = tinysnitch.lib.check_output('ps -ef | grep "bin/tinysnitch\-b" | grep -v grep | awk "{print \$2}"').splitlines()
-        if trace_pids:
-            for pid in trace_pids:
-                print('DEBUG killing existing trace program:', tinysnitch.lib.check_output('ps', pid))
-                tinysnitch.lib.check_call('sudo kill', pid)
-        if log_sizes:
-            tinysnitch.lib.run_thread(_log_sizes)
-        tinysnitch.dns.start()
-        tinysnitch.trace.start()
-        tinysnitch.rules.start()
-        nfq_handle, nfq_q_handle = tinysnitch.netfilter.create()
-        try:
-            nfq_fd = tinysnitch.netfilter.setup(nfq_handle, nfq_q_handle)
-            tinysnitch.netfilter.run(nfq_handle, nfq_fd)
-        except KeyboardInterrupt:
-            pass
-        finally:
-            tinysnitch.netfilter.destroy(nfq_q_handle, nfq_handle)
+    trace_pids = tinysnitch.lib.check_output('ps -ef | grep "bin/tinysnitch\-b" | grep -v grep | awk "{print \$2}"').splitlines()
+    if trace_pids:
+        for pid in trace_pids:
+            print('DEBUG killing existing trace program:', tinysnitch.lib.check_output('ps', pid))
+            tinysnitch.lib.check_call('sudo kill', pid)
+    if 'TINYSNITCH_LOG_SIZES' in os.environ:
+        tinysnitch.lib.run_thread(_log_sizes)
+    tinysnitch.dns.start()
+    tinysnitch.trace.start()
+    tinysnitch.rules.start()
+    nfq_handle, nfq_q_handle = tinysnitch.netfilter.create()
+    try:
+        nfq_fd = tinysnitch.netfilter.setup(nfq_handle, nfq_q_handle)
+        tinysnitch.netfilter.run(nfq_handle, nfq_fd)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        tinysnitch.netfilter.destroy(nfq_q_handle, nfq_handle)

@@ -1,0 +1,10 @@
+#!/bin/bash
+set -xeu
+
+tinysnitch-iptables-remove || true # cleanup any existing rules
+
+sudo iptables -I INPUT --protocol udp --sport 53 -j NFQUEUE --queue-num 0             # catch dns packets on the way back in so we can read the resolved address
+sudo iptables -I OUTPUT -t mangle -m conntrack --ctstate NEW -j NFQUEUE --queue-num 0 # potentially block incoming traffic
+sudo iptables -I INPUT -t mangle -m conntrack --ctstate NEW -j NFQUEUE --queue-num 0  # potentially block outgoing traffic
+sudo iptables -I INPUT -m mark --mark 101285 -j REJECT                                # inbound rejection mark
+sudo iptables -I OUTPUT -m mark --mark 101285 -j REJECT                               # outbound rejection mark
