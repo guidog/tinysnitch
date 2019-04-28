@@ -199,69 +199,52 @@ def _load_permanent_rules():
     if list(lines):
         log(f'INFO loaded {i + 1} rules from {state.rules_file}')
 
+def _prompt(finalize, conn, prompt_conn):
+    # we match rule again here in case a rule was added while this conn was waiting in the queue
+    rule = match_rule(*conn)
+    if rule:
+        action, _duration, _start = rule
+        if action == 'deny':
+            finalize('deny', conn)
+            return 'deny'
+        else:
+            return 'allow'
+    else:
+        try:
+            duration, scope, action, granularity = tinysnitch.lib.check_output(f'su {_prompt_user} -c \'DISPLAY=:0 tinysnitch-prompt "{tinysnitch.dns.format(*prompt_conn)}"\' 2>/dev/null').split()
+        except:
+            log('ERROR failed run tinysnitch-prompt')
+            finalize('deny', conn)
+            return 'deny'
+        else:
+            action = _process_rule(conn, duration, scope, action, granularity)
+            if action == 'deny':
+                finalize('deny', conn)
+                return 'deny'
+            else:
+                return 'allow'
+
 def _process_prompt_queue():
-    # we match rule again here in case a rule was added while this conn was
-    # waiting in the queue
     while True:
         finalize, conn = state._prompt_queue.get()
         _src, dst, _src_port, _dst_port, _proto, _pid, _path, _args = conn
         if not tinysnitch.trace.is_alive(*conn):
             finalize('deny', conn)
+        # inbound connection
         elif tinysnitch.dns.is_localhost(dst):
-            dst_rule = match_rule(*conn)
-            if dst_rule:
-                action, _duration, _start = dst_rule
-                if action == 'deny':
-                    finalize('deny', conn)
-                    continue
-            else:
-                try:
-                    duration, scope, action, granularity = tinysnitch.lib.check_output(f'sudo su {_prompt_user} -c \'DISPLAY=:0 tinysnitch-prompt "{tinysnitch.dns.format(*conn)}"\' 2>/dev/null').split()
-                except:
-                    log('ERROR failed run tinysnitch-prompt')
-                    return finalize('deny', conn)
-                else:
-                    action = _process_rule(conn, duration, scope, action, granularity)
-                    if action == 'deny':
-                        finalize('deny', conn)
-                        continue
-            src_conn = to_src_conn(*conn)
-            try:
-                src_conn = tinysnitch.trace.add_meta(*src_conn)
-            except KeyError:
-                pass # best effort to show client program for localhost src-conn
-            src_rule = match_rule(*src_conn)
-            if src_rule:
-                action, _duration, _start = src_rule
-                if action == 'deny':
-                    finalize('deny', src_conn)
-            else:
-                try:
-                    duration, scope, action, granularity = tinysnitch.lib.check_output(f'sudo su {_prompt_user} -c \'DISPLAY=:0 tinysnitch-prompt "{tinysnitch.dns.format(*to_src_proto(*conn))}"\' 2>/dev/null').split()
-                except:
-                    log('ERROR failed run tinysnitch-prompt')
-                    finalize('deny', src_conn)
-                    continue
-                else:
-                    action = _process_rule(src_conn, duration, scope, action, granularity)
-                    if action == 'deny':
-                        finalize('deny', src_conn)
-                        continue
+            # first rule: localhost and local port
+            action = _prompt(finalize, conn, conn)
+            if action == 'deny':
+                continue
+            # second rule: remote source and local port
+            action = _prompt(finalize, to_src_conn(*conn), to_src_proto(*conn))
+            if action == 'deny':
+                continue
             finalize('allow', conn)
+        # outbound connection: remote destination and remote port
         else:
-            rule = match_rule(*conn)
-            if rule:
-                action, _duration, _start = rule
-                finalize(action, conn)
-            else:
-                try:
-                    duration, scope, action, granularity = tinysnitch.lib.check_output(f'sudo su {_prompt_user} -c \'DISPLAY=:0 tinysnitch-prompt "{tinysnitch.dns.format(*conn)}"\' 2>/dev/null').split()
-                except:
-                    log('ERROR failed run tinysnitch-prompt')
-                    finalize('deny', conn)
-                else:
-                    action = _process_rule(conn, duration, scope, action, granularity)
-                    finalize(action, conn)
+            action = _prompt(finalize, conn, conn)
+            finalize(action, conn)
     log('FATAL process-prompt-queue exited prematurely')
     sys.exit(1)
 
