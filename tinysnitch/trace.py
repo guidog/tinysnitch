@@ -146,11 +146,14 @@ def _tail(name, proc, callback):
         else:
             if not line:
                 break
-            try:
-                callback(*line.split())
-            except TypeError:
-                # log(f'WARN bad {name} line {[line]}')
-                pass
+            elif line.startswith('fatal error:'):
+                log(f'FATAL {name} {line}')
+                sys.exit(1)
+            else:
+                try:
+                    callback(*line.split())
+                except TypeError:
+                    log(f'WARN bad {name} line {[line]}')
     log(f'FATAL tail {name} exited prematurely')
     sys.exit(1)
 
