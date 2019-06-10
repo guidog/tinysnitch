@@ -1,0 +1,140 @@
+#!/usr/bin/python2
+#
+# Copyright 2017 Kinvolk GmbH
+#
+# Licensed under the Apache License, Version 2.0 (the "License")
+#
+from __future__ import print_function
+from bcc import BPF
+from socket import inet_ntop, AF_INET
+from struct import pack
+
+bpf_text = """
+#include <uapi/linux/ptrace.h>
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wtautological-compare"
+#include <net/sock.h>
+#pragma clang diagnostic pop
+#include <net/inet_sock.h>
+#include <net/net_namespace.h>
+#include <bcc/proto.h>
+
+#define TCP_EVENT_TYPE_CONNECT 1
+#define TCP_EVENT_TYPE_ACCEPT  2
+
+struct tcp_ipv4_event_t {
+    u32 type;
+    u32 pid;
+    u32 saddr;
+    u32 daddr;
+    u16 sport;
+    u16 dport;
+};
+BPF_PERF_OUTPUT(tcp_ipv4_event);
+
+struct ipv4_tuple_t {
+    u32 saddr;
+    u32 daddr;
+    u16 sport;
+    u16 dport;
+};
+
+struct pid_t {
+    u64 pid;
+};
+
+BPF_HASH(tuplepid_ipv4, struct ipv4_tuple_t, struct pid_t);
+
+BPF_HASH(connectsock, u64, struct sock *);
+
+static int read_ipv4_tuple(struct ipv4_tuple_t *tuple, struct sock *skp) {
+  tuple->saddr = skp->__sk_common.skc_rcv_saddr;
+  tuple->daddr = skp->__sk_common.skc_daddr;
+  tuple->sport = ((struct inet_sock *)skp)->inet_sport;
+  tuple->dport = skp->__sk_common.skc_dport;
+  if (tuple->saddr == 0 || tuple->daddr == 0 || tuple->sport == 0 || tuple->dport == 0) { return 0; }
+  return 1;
+}
+
+int trace_connect_v4_entry(struct pt_regs *ctx, struct sock *sk) {
+  u64 pid = bpf_get_current_pid_tgid();
+  connectsock.update(&pid, &sk);
+  return 0;
+}
+
+int trace_connect_v4_return(struct pt_regs *ctx) {
+  int ret = PT_REGS_RC(ctx);
+  u64 pid = bpf_get_current_pid_tgid();
+  struct sock **skpp;
+  skpp = connectsock.lookup(&pid);
+  if (skpp == 0) { return 0; }
+  connectsock.delete(&pid);
+  if (ret != 0) { return 0; }
+  struct sock *skp = *skpp;
+  struct ipv4_tuple_t t = { };
+  if (!read_ipv4_tuple(&t, skp)) { return 0; }
+  struct pid_t p = { };
+  p.pid = pid;
+  tuplepid_ipv4.update(&t, &p);
+  return 0;
+}
+
+int trace_tcp_set_state_entry(struct pt_regs *ctx, struct sock *skp, int state) {
+  if (state != TCP_ESTABLISHED && state != TCP_CLOSE) { return 0; }
+  if (skp->__sk_common.skc_family == AF_INET) {
+      struct ipv4_tuple_t t = { };
+      if (!read_ipv4_tuple(&t, skp)) { return 0; }
+      if (state == TCP_CLOSE) { tuplepid_ipv4.delete(&t); return 0; }
+      struct pid_t *p;
+      p = tuplepid_ipv4.lookup(&t);
+      if (p == 0) { return 0; }
+      struct tcp_ipv4_event_t evt4 = { };
+      evt4.type = TCP_EVENT_TYPE_CONNECT;
+      evt4.pid = p->pid >> 32;
+      evt4.saddr = t.saddr;
+      evt4.daddr = t.daddr;
+      evt4.sport = ntohs(t.sport);
+      evt4.dport = ntohs(t.dport);
+      tcp_ipv4_event.perf_submit(ctx, &evt4, sizeof(evt4));
+      tuplepid_ipv4.delete(&t);
+  }
+  return 0;
+}
+
+int trace_accept_return(struct pt_regs *ctx) {
+  struct sock *newsk = (struct sock *)PT_REGS_RC(ctx);
+  u64 pid = bpf_get_current_pid_tgid();
+  if (newsk == NULL) { return 0; }
+  u16 sport = 0, dport = 0;
+  dport = newsk->__sk_common.skc_dport;
+  sport = newsk->__sk_common.skc_num;
+  if (newsk->__sk_common.skc_family == AF_INET) {
+      struct tcp_ipv4_event_t evt4 = { 0 };
+      evt4.type = TCP_EVENT_TYPE_ACCEPT;
+      evt4.pid = pid >> 32;
+      evt4.daddr = newsk->__sk_common.skc_rcv_saddr;
+      evt4.saddr = newsk->__sk_common.skc_daddr;
+      evt4.dport = sport;
+      evt4.sport = ntohs(dport);
+      if (evt4.saddr != 0 && evt4.daddr != 0 && evt4.sport != 0 && evt4.dport != 0)
+          tcp_ipv4_event.perf_submit(ctx, &evt4, sizeof(evt4));
+  }
+  return 0;
+}
+"""
+
+kinds = {1: "connect", 2: "accept"}
+def print_ipv4_event(_cpu, data, _size):
+    event = bpf["tcp_ipv4_event"].event(data)
+    kind = kinds.get(event.type, 'unknown')
+    print(event.pid, inet_ntop(AF_INET, pack("I", event.saddr)), event.sport, inet_ntop(AF_INET, pack("I", event.daddr)), event.dport)
+
+bpf = BPF(text=bpf_text)
+bpf.attach_kprobe(event="tcp_v4_connect", fn_name="trace_connect_v4_entry")
+bpf.attach_kretprobe(event="tcp_v4_connect", fn_name="trace_connect_v4_return")
+bpf.attach_kprobe(event="tcp_set_state", fn_name="trace_tcp_set_state_entry")
+bpf.attach_kretprobe(event="inet_csk_accept", fn_name="trace_accept_return")
+
+bpf["tcp_ipv4_event"].open_perf_buffer(print_ipv4_event)
+while True:
+    bpf.perf_buffer_poll()
