@@ -37,10 +37,10 @@ class state:
 def start():
     _load_existing_pids()
     tinysnitch.lib.run_thread(_gc)
-    _pairs = [('tinysnitch-bpftrace-tcp', _cb_tcp_udp),
-              ('tinysnitch-bpftrace-udp', _cb_tcp_udp),
-              ('tinysnitch-bpftrace-fork', _cb_fork),
-              ('tinysnitch-bpftrace-exit', _cb_exit),
+    _pairs = [('tinysnitch-bcc-tcp', _cb_tcp_udp),
+              ('tinysnitch-bcc-udp', _cb_tcp_udp),
+              ('tinysnitch-bcc-fork', _cb_fork),
+              ('tinysnitch-bcc-exit', _cb_exit),
               ('tinysnitch-bcc-execve', _cb_execve)]
     for program, cb in _pairs:
         proc = subprocess.Popen(['stdbuf', '-o0', program], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)

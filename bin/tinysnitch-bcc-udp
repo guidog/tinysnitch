@@ -66,7 +66,7 @@ int kprobe__udp_sendmsg(struct pt_regs *ctx, struct sock *sk) {
     u64 pid = bpf_get_current_pid_tgid();
     u16 family = sk->__sk_common.skc_family;
     u16 sport = 0, dport = 0;
-    if (family == AF_INET) {
+    if (family == AF_INET && sk->__sk_common.skc_dport != 0) {
         struct sendmsg_data_t data = {};
         data.pid = pid >> 32;
         data.saddr = sk->__sk_common.skc_rcv_saddr;
@@ -89,7 +89,7 @@ def print_sendmsg_event(cpu, data, size):
     event = ct.cast(data, ct.POINTER(Data_sendmsg)).contents
     val = '%s %s %s %s %s' % (event.pid, inet_ntop(AF_INET, pack('I', event.saddr)), event.sport, inet_ntop(AF_INET, pack('I', event.daddr)), event.dport)
     if val != last_sendmsg:
-        print('sendmsg', val)
+        print(val)
         last_sendmsg = val
 
 class Data_rcv_skb(ct.Structure):
@@ -99,9 +99,9 @@ last_rcv_skb = None
 def print_rcv_skb_event(cpu, data, size):
     global last_rcv_skb
     event = ct.cast(data, ct.POINTER(Data_rcv_skb)).contents
-    val = '%s %s %s %s' % (inet_ntop(AF_INET, pack('I', event.daddr)), event.dport, inet_ntop(AF_INET, pack('I', event.saddr)), event.sport)
+    val = '0 %s %s %s %s' % (inet_ntop(AF_INET, pack('I', event.saddr)), event.sport, inet_ntop(AF_INET, pack('I', event.daddr)), event.dport)
     if val != last_rcv_skb:
-        print('rcv_skb', val)
+        print(val)
         last_rcv_skb = val
 
 b = BPF(text=bpf_text)
