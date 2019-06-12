@@ -1,0 +1,6 @@
+#!/usr/bin/env bpftrace
+
+tracepoint:sched:sched_process_fork
+{
+    printf("%d %d\n", pid, args->child_pid);
+}
