@@ -26,13 +26,16 @@ import time
 import queue
 from tinysnitch.lib import log
 
+_queue_size = 1024 * 1024
+
 class state:
     _lock = threading.RLock()
     _pids = {} # {pid: (path, args)}
     _listening_lock = threading.RLock()
     _listening_conns = {} # {port: pid}
     _conns = {} # {(src, src_port, dst, dst_port): pid}
-    _gc_queue = queue.Queue(1024 * 1024)
+    _gc_queue = queue.Queue(_queue_size)
+    _gc_exit_queue = queue.Queue(_queue_size)
 
 def start():
     _load_existing_pids()
@@ -48,7 +51,7 @@ def start():
         tinysnitch.lib.run_thread(_tail, program, proc, cb)
 
 def rm_conn(src, dst, src_port, dst_port, _proto, _pid, _path, _args):
-    state._gc_queue.put((src, src_port, dst, dst_port, time.monotonic()))
+    state._gc_queue.put((src, src_port, dst, dst_port))
 
 def is_alive(_src, _dst, _src_port, _dst_port, _proto, pid, _path, _args):
     return pid == '-' or pid in state._pids
@@ -113,9 +116,7 @@ def _cb_tcp_udp(pid, src, src_port, dst, dst_port):
     state._conns[k] = pid
 
 def _cb_exit(pid):
-    state._pids.pop(pid, None)
-    ports = {_pid: _port for _port, _pid in state._listening_conns.items()}
-    state._listening_conns.pop(ports.get(pid), None)
+    state._gc_exit_queue.put(pid)
 
 def _cb_fork(pid, child_pid):
     with state._lock:
@@ -123,16 +124,22 @@ def _cb_fork(pid, child_pid):
             state._pids[child_pid] = state._pids[pid]
 
 def _gc():
-    grace_seconds = 5 # TODO ideal value?
+    lru_size = int(_queue_size / 2)
     while True:
-        now = time.monotonic()
-        for _ in range(state._gc_queue.qsize()):
-            src, src_port, dst, dst_port, start = state._gc_queue.get()
-            if now - start > grace_seconds: # sometimes dns request reuse the same port, so a grace period before cleanup
-                state._conns.pop((src, src_port, dst, dst_port), None)
-            else:
-                state._gc_queue.put((src, src_port, dst, dst_port, start))
-        time.sleep(grace_seconds)
+        # gc exits
+        size = state._gc_exit_queue.qsize()
+        for _ in range(min(0, size - lru_size)):
+            pid = state._gc_exit_queue.get()
+            ports = {_pid: _port for _port, _pid in state._listening_conns.items()}
+            with state._lock:
+                state._pids.pop(pid, None)
+                state._listening_conns.pop(ports.get(pid), None)
+        # gc conns
+        size = state._gc_queue.qsize()
+        for _ in range(min(0, size - lru_size)):
+            src, src_port, dst, dst_port = state._gc_queue.get()
+            state._conns.pop((src, src_port, dst, dst_port), None)
+        time.sleep(15)
     log('ERROR trace gc exited prematurely')
     sys.exit(1)
 
