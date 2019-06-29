@@ -210,8 +210,10 @@ def _prompt(finalize, conn, prompt_conn):
         else:
             return 'allow'
     else:
+        formatted = tinysnitch.dns.format(*prompt_conn)
+        formatted = formatted.replace('$', '\$').replace('(', '\(').replace(')', '\)').replace('`', '\`')
         try:
-            duration, scope, action, granularity = tinysnitch.lib.check_output(f'su {_prompt_user} -c \'DISPLAY=:0 tinysnitch-prompt "{tinysnitch.dns.format(*prompt_conn)}"\' 2>/dev/null').split()
+            duration, scope, action, granularity = tinysnitch.lib.check_output(f'su {_prompt_user} -c \'DISPLAY=:0 tinysnitch-prompt "{formatted}"\' 2>/dev/null').split()
         except:
             log('ERROR failed run tinysnitch-prompt')
             finalize('deny', conn)
