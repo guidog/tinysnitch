@@ -17,6 +17,7 @@
 # or write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
+import os
 import time
 import tinysnitch.lib
 import subprocess
@@ -108,7 +109,15 @@ def add_meta(src, dst, src_port, dst_port, proto, pid, path, args):
                 path, args = state._pids[pid]
     return src, dst, src_port, dst_port, proto, pid, path, args
 
+_trims = set(os.environ.get('TINYSNITCH_TRIMS', 'python python2 python3 bash sudo timeout node ruby').split())
+
 def _cb_execve(pid, path, *args):
+    if args:
+        if path.split('/')[-1] in _trims:
+            path, *args = args
+        _args = [path] + list(args)
+        if any('=' in x for x in _args):
+            path, *args = [x for x in _args if '=' not in x]
     state._pids[pid] = path, ' '.join(args)
 
 def _cb_tcp_udp(pid, src, src_port, dst, dst_port):
