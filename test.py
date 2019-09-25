@@ -114,3 +114,20 @@ def test_inbound_allow_remote():
                               f'allow tcp localhost:8000 /home/nathants/.envs/python3/bin/python3 -m http.server']
         finally:
             proc.terminate()
+
+def test_inbound_allow_udp():
+    run(f'allow localhost 1200 udp bin/udp/server.py -',
+        f'allow localhost 1200 udp-src bin/udp/server.py -')
+    proc = subprocess.Popen('python3 bin/udp/server.py 1200', shell=True)
+    try:
+        for _ in range(5):
+            try:
+                assert co('timeout 1 python3 bin/udp/client.py ping 0.0.0.0:1200') == 'pong'
+                break
+            except:
+                pass
+        assert logs() == ['allow udp localhost:1200 bin/udp/server.py 1200',
+                          'allow udp localhost:1200 bin/udp/server.py 1200']
+    finally:
+        proc.terminate()
+
