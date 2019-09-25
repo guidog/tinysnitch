@@ -113,7 +113,7 @@ _trims = set(os.environ.get('TINYSNITCH_TRIMS', 'python python2 python3 bash sud
 
 def _cb_execve(pid, path, *args):
     if args:
-        if path.split('/')[-1] in _trims:
+        if path.split('/')[-1] in _trims and args[0] != '-m': # special case: python3 -m http.server
             path, *args = args
         _args = [path] + list(args)
         if any('=' in x for x in _args):
