@@ -26,7 +26,7 @@ def setup_module():
     cc('tinysnitch-iptables-add')
 
 def setup_function():
-    assert co('ps -ef | grep tinysnitch | grep -v -e test -e grep | wc -l') == '0'
+    assert co('ps -ef | grep tinysnitch | grep -v -e test -e grep | wc -l') == '0', 'fatal: tinysnitch is not running'
 
 def teardown_function():
     pids = [x.split()[1] for x in co('ps -ef|grep tinysnitch').splitlines()]
@@ -46,6 +46,15 @@ def test_outbound_deny():
         cc('curl -v google.com')
     assert logs() == ['deny udp 1.1.1.1:53 /usr/bin/curl -v google.com',
                       'deny udp 1.1.1.1:53 /usr/bin/curl -v google.com']
+
+def test_outbound_deny_tcp():
+    run('allow 1.1.1.1 53 udp /usr/bin/curl -',
+        'deny google.com 80 tcp /usr/bin/curl -')
+    with pytest.raises(subprocess.CalledProcessError):
+        cc('curl -v google.com')
+    assert logs() == ['allow udp 1.1.1.1:53 /usr/bin/curl -v google.com',
+                      'allow udp 1.1.1.1:53 /usr/bin/curl -v google.com',
+                      'deny tcp google.com:80 /usr/bin/curl -v google.com']
 
 def test_inbound_allow():
     python3 = co('which python3')
