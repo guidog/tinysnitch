@@ -100,30 +100,6 @@ def _finalize(nfq, id, data, size, orig_conn, action, conn):
 def _py_callback(id, data, size):
     unpacked = bytes(ffi.unpack(data, size))
     packet = scapy.layers.inet.IP(unpacked)
-    tinysnitch.dns.update_hosts(packet)
     conn = tinysnitch.lib.conn(packet)
     finalize = lambda action, new_conn: _finalize(state._nfq_q_handle, id, data, size, conn, action, new_conn)
-    resolved_conn = tinysnitch.dns.resolve(*conn)
-
-    # the fastest rule types dont require pid/path/args
-    rule = tinysnitch.rules.match_rule(*resolved_conn)
-    if rule:
-        action, _duration, _start = rule
-        finalize(action, resolved_conn)
-
-    # auto allow and dont double print dns packets, the only ones we track after --ctstate NEW, so that we can log the solved addr
-    elif tinysnitch.dns.is_inbound_dns(*conn):
-        finalize('allow', conn)
-
-    else:
-        # make a single attempt to add meta
-        try:
-            conn = tinysnitch.trace.add_meta(*conn)
-
-        # otherwise enqueue for delayed processing
-        except KeyError:
-            tinysnitch.rules.enqueue(finalize, conn)
-
-        # on good meta lookup, process inline
-        else:
-            tinysnitch.rules.check(finalize, conn)
+    finalize('allow', conn)
