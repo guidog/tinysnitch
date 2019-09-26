@@ -92,29 +92,6 @@ def test_inbound_deny_src():
     finally:
         proc.terminate()
 
-def test_inbound_allow_remote():
-    user = os.environ.get('TINYSNITCH_TEST_USER', 'root')
-    local = os.environ.get('TINYSNITCH_TEST_LOCAL', '192.168.2.94')
-    remote = os.environ.get('TINYSNITCH_TEST_REMOTE', '192.168.2.68')
-    python3 = co('which python3')
-    ssh = co('which ssh')
-    run(f'allow {remote} 22 tcp {ssh} -',
-        f'allow localhost 8000 tcp {python3} -m http.server',
-        f'allow {remote} 8000 tcp-src {python3} -m http.server')
-    try:
-        cc(f'ssh {user}@{remote} whoami')
-    except:
-        print('skipping test_inbound_allow_remote because remote inaccessible')
-    else:
-        proc = subprocess.Popen('cd $(mktemp -d) && echo bar > foo && python3 -m http.server', shell=True)
-        try:
-            assert co(f'ssh {user}@{remote} curl {local}:8000/foo') == 'bar'
-            assert logs() == [f'allow tcp {remote}:22 /usr/bin/ssh {user}@{remote} whoami',
-                              f'allow tcp {remote}:22 /usr/bin/ssh {user}@{remote} curl {local}:8000/foo',
-                              f'allow tcp localhost:8000 /home/nathants/.envs/python3/bin/python3 -m http.server']
-        finally:
-            proc.terminate()
-
 def test_inbound_allow_udp():
     run(f'allow localhost 1200 udp bin/udp/server.py -',
         f'allow localhost 1200 udp-src bin/udp/server.py -')
@@ -131,3 +108,32 @@ def test_inbound_allow_udp():
     finally:
         proc.terminate()
 
+def test_inbound_deny_dst_udp():
+    run(f'deny localhost 1200 udp bin/udp/server.py -',
+        f'allow localhost 1200 udp-src bin/udp/server.py -')
+    proc = subprocess.Popen('python3 bin/udp/server.py 1200', shell=True)
+    try:
+        for _ in range(5):
+            try:
+                assert co('timeout 1 python3 bin/udp/client.py ping 0.0.0.0:1200') == 'pong'
+                break
+            except:
+                pass
+        assert logs() == ['deny udp localhost:1200 bin/udp/server.py 1200'] * 4
+    finally:
+        proc.terminate()
+
+def test_inbound_deny_src_udp():
+    run(f'allow localhost 1200 udp bin/udp/server.py -',
+        f'deny localhost 1200 udp-src bin/udp/server.py -')
+    proc = subprocess.Popen('python3 bin/udp/server.py 1200', shell=True)
+    try:
+        for _ in range(5):
+            try:
+                assert co('timeout 1 python3 bin/udp/client.py ping 0.0.0.0:1200') == 'pong'
+                break
+            except:
+                pass
+        assert logs() == ['deny udp-src localhost:1200 bin/udp/server.py 1200'] * 4
+    finally:
+        proc.terminate()
