@@ -1,6 +1,6 @@
-![](example_curl.gif)
+![](gifs/example_curl.gif)
 
-![](example_firefox.gif)
+![](gifs/example_firefox.gif)
 
 ## why
 
