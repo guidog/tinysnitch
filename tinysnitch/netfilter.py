@@ -36,10 +36,7 @@ except ModuleNotFoundError:
     os.chdir(orig)
     from tinysnitch._netfilter import ffi, lib
 
-import tinysnitch.dns
 import tinysnitch.lib
-import tinysnitch.rules
-import tinysnitch.trace
 import scapy.layers.inet
 import time
 
@@ -84,17 +81,17 @@ def destroy(nfq_q_handle, nfq_handle):
     if nfq_handle:
         assert lib.nfq_close(nfq_handle) == 0
 
+def _format(src, dst, src_port, dst_port, proto, pid, path, args):
+    return f'{proto} | {src}:{src_port} -> {dst}:{dst_port} | {pid} {path} | {args}'
+
 def _finalize(nfq, id, data, size, orig_conn, action, conn):
-    _src, _dst, _src_port, _dst_port, proto, _pid, _path, _args = conn
-    if not tinysnitch.dns.is_inbound_dns(*conn) and proto in tinysnitch.lib.protos:
-        log(f'INFO {action} {tinysnitch.dns.format(*conn)}')
+    log(f'INFO {action} {_format(*conn)}')
     if action == 'allow':
         lib.nfq_set_verdict(nfq, id, ONE, ZERO, NULL)
     elif action == 'deny':
         lib.nfq_set_verdict2(nfq, id, ONE, MARK, size, data)
     else:
         assert False, f'bad action: {action}'
-    tinysnitch.trace.rm_conn(*orig_conn)
 
 @ffi.def_extern()
 def _py_callback(id, data, size):
