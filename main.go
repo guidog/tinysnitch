@@ -2,13 +2,11 @@ package main
 
 import (
 	"flag"
-	"github.com/evilsocket/opensnitch/conn"
-	"github.com/evilsocket/opensnitch/dns"
-	"github.com/evilsocket/opensnitch/iptables"
-	"github.com/evilsocket/opensnitch/lib"
-	"github.com/evilsocket/opensnitch/log"
-	"github.com/evilsocket/opensnitch/netfilter"
-	"github.com/evilsocket/opensnitch/procmon"
+	"github.com/nathants/tinysnitch/conn"
+	"github.com/nathants/tinysnitch/iptables"
+	"github.com/nathants/tinysnitch/log"
+	"github.com/nathants/tinysnitch/netfilter"
+	"github.com/nathants/tinysnitch/procmon"
 	"io/ioutil"
 	golog "log"
 	"os"
@@ -84,28 +82,13 @@ func firewall(enable bool) {
 }
 
 func onPacket(packet netfilter.Packet) {
-	if dns.TrackAnswers(packet.Packet) {
-		log.Info("dns tracked")
-		// packet.SetVerdict(netfilter.NF_ACCEPT)
-		// return
-	}
 	con := conn.Parse(packet)
 	if con == nil {
-		// log.Error("what are these?: %s", packet.Packet)
 		packet.SetVerdict(netfilter.NF_ACCEPT)
 		return
 	}
-	_, err := lib.Exec("notify", []string{"-f24", "-l120", con.String()})
-	if err != nil {
-		log.Fatal("oh noes")
-	}
-	if true {
-		packet.SetVerdict(netfilter.NF_ACCEPT)
-		log.Info("allow: %s", con.SingleString())
-	} else {
-		packet.SetVerdictAndMark(netfilter.NF_DROP, iptables.DropMark)
-		log.Info("deny: %s", con.SingleString())
-	}
+	packet.SetVerdict(netfilter.NF_ACCEPT)
+	log.Info("allow: %s", con.SingleString())
 }
 
 func worker(id int) {

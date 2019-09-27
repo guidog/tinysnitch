@@ -19,7 +19,7 @@ dev:
 	| grep -v '\.backup' \
 	| sudo entr -r sudo -u $(USER) bash -c " \
 		. ~/.bashrc; \
-		cd $(GOPATH)/src/github.com/evilsocket/opensnitch; \
+		cd $(GOPATH)/src/github.com/nathants/tinysnitch; \
 		set -x; \
 		make; \
 		sudo ./opensnitchd \

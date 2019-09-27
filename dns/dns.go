@@ -1,7 +1,7 @@
 package dns
 
 import (
-	"github.com/evilsocket/opensnitch/log"
+	"github.com/nathants/tinysnitch/log"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"net"

@@ -3,7 +3,7 @@ package procmon
 import (
 	"fmt"
 	"github.com/evilsocket/ftrace"
-	"github.com/evilsocket/opensnitch/lib"
+	"github.com/nathants/tinysnitch/lib"
 	"io/ioutil"
 	"os"
 	"strconv"

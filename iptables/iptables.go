@@ -2,7 +2,7 @@ package iptables
 
 import (
 	"fmt"
-	"github.com/evilsocket/opensnitch/lib"
+	"github.com/nathants/tinysnitch/lib"
 )
 
 const DropMark = 0x18BA5
