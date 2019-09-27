@@ -152,64 +152,14 @@ func onPacket(packet netfilter.Packet) {
 		return
 	}
 
-	// search a match in preloaded rules
-	connected := false
-	missed := false
-	r := rules.FindFirstMatch(con)
-	if r == nil {
-		missed = true
-		// no rule matched, send a request to the
-		// UI client if connected and running
-		r, connected = uiClient.Ask(con)
-		if connected {
-			ok := false
-			pers := ""
-			action := string(r.Action)
-			if r.Action == rule.Allow {
-				action = log.Green(action)
-			} else {
-				action = log.Red(action)
-			}
-
-			// check if and how the rule needs to be saved
-			if r.Duration == rule.Restart {
-				pers = "Added"
-				// add to the rules but do not save to disk
-				if err := rules.Add(r, false); err != nil {
-					log.Error("Error while adding rule: %s", err)
-				} else {
-					ok = true
-				}
-			} else if r.Duration == rule.Always {
-				pers = "Saved"
-				// add to the loaded rules and persist on disk
-				if err := rules.Add(r, true); err != nil {
-					log.Error("Error while saving rule: %s", err)
-				} else {
-					ok = true
-				}
-			}
-
-			if ok {
-				log.Important("%s new rule: %s if %s", pers, action, r.Operator.String())
-			}
-		}
-	}
-
-	stats.OnConnectionEvent(con, r, missed)
-
-	if r.Action == rule.Allow {
+	if true {
 		packet.SetVerdict(netfilter.NF_ACCEPT)
 
-		ruleName := log.Green(r.Name)
-		if r.Operator.Operand == rule.OpTrue {
-			ruleName = log.Dim(r.Name)
-		}
-		log.Debug("%s %s -> %s:%d (%s)", log.Bold(log.Green("✔")), log.Bold(con.Process.Path), log.Bold(con.To()), con.DstPort, ruleName)
+		log.Debug("%s %s -> %s:%d", log.Bold(log.Green("✔")), log.Bold(con.Process.Path), log.Bold(con.To()), con.DstPort)
 	} else {
 		packet.SetVerdictAndMark(netfilter.NF_DROP, firewall.DropMark)
 
-		log.Warning("%s %s -> %s:%d (%s)", log.Bold(log.Red("✘")), log.Bold(con.Process.Path), log.Bold(con.To()), con.DstPort, log.Red(r.Name))
+		log.Warning("%s %s -> %s:%d", log.Bold(log.Red("✘")), log.Bold(con.Process.Path), log.Bold(con.To()), con.DstPort)
 	}
 }
 

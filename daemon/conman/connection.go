@@ -40,18 +40,6 @@ func Parse(nfp netfilter.Packet) *Connection {
 		if ok == false || ip == nil {
 			return nil
 		}
-
-		// we're not interested in connections
-		// from/to the localhost interface
-		if ip.SrcIP.IsLoopback() {
-			return nil
-		}
-
-		// skip multicast stuff
-		if ip.SrcIP.IsMulticast() || ip.DstIP.IsMulticast() {
-			return nil
-		}
-
 		con, err := NewConnection6(&nfp, ip)
 		if err != nil {
 			log.Debug("%s", err)
@@ -65,18 +53,6 @@ func Parse(nfp netfilter.Packet) *Connection {
 		if ok == false || ip == nil {
 			return nil
 		}
-
-		// we're not interested in connections
-		// from/to the localhost interface
-		if ip.SrcIP.IsLoopback() {
-			return nil
-		}
-
-		// skip multicast stuff
-		if ip.SrcIP.IsMulticast() || ip.DstIP.IsMulticast() {
-			return nil
-		}
-
 		con, err := NewConnection(&nfp, ip)
 		if err != nil {
 			log.Debug("%s", err)

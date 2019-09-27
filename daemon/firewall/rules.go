@@ -52,12 +52,11 @@ func QueueDNSResponses(enable bool, queueNum int) (err error) {
 			"--sport", "53",
 			"-j", "NFQUEUE",
 			"--queue-num", fmt.Sprintf("%d", queueNum),
-			"--queue-bypass",
 		}
-		
+
 		lock.Lock()
 		defer lock.Unlock()
-		
+
 		_, err := core.Exec("iptables", rule)
 		if err != nil {
 			return err
@@ -77,7 +76,6 @@ func QueueDNSResponses(enable bool, queueNum int) (err error) {
 		"--sport", "53",
 		"-j", "NFQUEUE",
 		"--queue-num", fmt.Sprintf("%d", queueNum),
-		"--queue-bypass",
 	})
 }
 
@@ -90,7 +88,6 @@ func QueueConnections(enable bool, queueNum int) (err error) {
 		"--ctstate", "NEW",
 		"-j", "NFQUEUE",
 		"--queue-num", fmt.Sprintf("%d", queueNum),
-		"--queue-bypass",
 	})
 }
 
