@@ -16,6 +16,10 @@ a [simplified opensnitch](https://github.com/nathants/tinysnitch/tree/opensnitch
 
 ![](gifs/benchmark_opensnitch.gif)
 
-tinysnitch approving all packets after proc lookup gets about 8k/sec.
+tinysnitch approving all inbount packets after proc lookup gets about 8k/sec. the rules whitelist `ran`.
 
-![](gifs/benchmark_tinysnitch.gif)
+![](gifs/benchmark_tinysnitch_inbound.gif)
+
+tinysnitch approving all outbound packets after proc lookup gets about 8k/sec. the rules whitelist `siege`. a [branch](https://github.com/nathants/tinysnitch/tree/always-outbound) allows local benchmarking of outbound connections.
+
+![](gifs/benchmark_tinysnitch_outbound.gif)
