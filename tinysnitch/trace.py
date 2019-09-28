@@ -96,15 +96,15 @@ def _listening_conns():
 def add_meta(src, dst, src_port, dst_port, proto, pid, path, args):
     # note: meta data has to happen on un-resolved src/dst addresses, ie ipv4 addresses
     if proto in tinysnitch.lib.protos:
-        if tinysnitch.dns.is_localhost(dst):
-            try:
-                with state._lock:
-                    pid = state._listening_conns[dst_port]
-                    path, args = state._pids[pid]
-            except KeyError:
-                tinysnitch.lib.run_thread(_listening_conns) # if we miss on a listening server, lookup all listening pids
-                raise
-        else:
+        # if tinysnitch.dns.is_localhost(dst):
+        #     try:
+        #         with state._lock:
+        #             pid = state._listening_conns[dst_port]
+        #             path, args = state._pids[pid]
+        #     except KeyError:
+        #         tinysnitch.lib.run_thread(_listening_conns) # if we miss on a listening server, lookup all listening pids
+        #         raise
+        # else:
             with state._lock:
                 pid = state._conns[(src, src_port, dst, dst_port)]
                 path, args = state._pids[pid]
