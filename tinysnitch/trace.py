@@ -69,11 +69,13 @@ def online_meta_lookup(src, dst, src_port, dst_port, proto, pid, path, args):
                 pid = _program.split('pid=')[-1].split(',')[0]
                 try:
                     path, *args = tinysnitch.lib.check_output('ps --no-heading -o args', pid).split()
-                    path = _resolve_relative_path(pid, path)
-                    path, args = _resolve_trims(path, args)
-                    args = ' '.join(args)
                 except subprocess.CalledProcessError:
                     pass # the pid could be gone by ps time
+                else:
+                    path, args = _resolve_trims(path, args)
+                    args = ' '.join(args)
+                    break
+    path = _resolve_relative_path(pid, path)
     return src, dst, src_port, dst_port, proto, pid, path, args
 
 def _listening_conns():
