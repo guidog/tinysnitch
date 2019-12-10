@@ -29,7 +29,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, words):
         self.qt_setup()
         self.duration = '9-minute'
-        self.granularity = 'args-and-path'
+        self.granularity = 'just-path'
         self.subdomains = False
         self.action = 'no'
         self.help = self.legend = False
