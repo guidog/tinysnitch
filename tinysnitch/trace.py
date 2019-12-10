@@ -58,7 +58,7 @@ def is_alive(_src, _dst, _src_port, _dst_port, _proto, pid, _path, _args):
     return pid == '-' or pid in state._pids
 
 def online_meta_lookup(src, dst, src_port, dst_port, proto, pid, path, args):
-    xs = tinysnitch.lib.check_output('ss -tupnH').splitlines()
+    xs = subprocess.check_output(['ss', '-tupnH']).decode('utf-8').strip().splitlines()
     for x in xs:
         try:
             _proto, _state, _, _, _src, _dst, _program = x.split()

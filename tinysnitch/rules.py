@@ -55,12 +55,15 @@ def match_rule(_src, dst, _src_port, dst_port, proto, _pid, path, args):
     if proto not in tinysnitch.lib.protos:
         return 'allow', None, None # allow all non tcp/udp
     else:
-        keys = [(dst, dst_port, proto, path, args), # addr, port, path, args
-                (dst, dst_port, proto, path, '-'),  # addr, port, path
-                (dst, dst_port, proto, '-', '-'),   # addr, port
-                (dst, '-', proto, path, args),      # addr, path, args
-                (dst, '-', proto, path, '-'),       # addr, path
-                (dst, '-', proto, '-', '-')]        # addr
+        dst_wildcard_subdomains = '*.' + '.'.join(dst.split('.')[-2:])
+        keys = [
+            (dst, dst_port, proto, path, args), # addr, port, path, args
+            (dst, dst_port, proto, path, '-'),  # addr, port, path
+            (dst, dst_port, proto, '-', '-'),   # addr, port
+            (dst_wildcard_subdomains, dst_port, proto, path, args), # addr, port, path, args
+            (dst_wildcard_subdomains, dst_port, proto, path, '-'),  # addr, port, path
+            (dst_wildcard_subdomains, dst_port, proto, '-', '-'),   # addr, port
+        ]
         for k in keys:
             try:
                 return state._rules[k]
@@ -213,13 +216,13 @@ def _prompt(finalize, conn, prompt_conn):
         formatted = tinysnitch.dns.format(*prompt_conn)
         formatted = formatted.replace('$', '\$').replace('(', '\(').replace(')', '\)').replace('`', '\`')
         try:
-            duration, scope, action, granularity = tinysnitch.lib.check_output(f'su {_prompt_user} -c \'DISPLAY=:0 tinysnitch-prompt "{formatted}"\' 2>/dev/null').split()
+            duration, subdomains, action, granularity = tinysnitch.lib.check_output(f'su {_prompt_user} -c \'DISPLAY=:0 tinysnitch-prompt "{formatted}"\' 2>/dev/null').split()
         except:
-            log('ERROR failed run tinysnitch-prompt')
+            log('ERROR failed to run tinysnitch-prompt')
             finalize('deny', conn)
             return 'deny'
         else:
-            action = _process_rule(conn, duration, scope, action, granularity)
+            action = _process_rule(conn, duration, subdomains, action, granularity)
             if action == 'deny':
                 finalize('deny', conn)
                 return 'deny'
@@ -258,7 +261,7 @@ def _process_online_meta_lookups_queue():
     log('FATAL process-online-meta-lookups-queue exited prematurely')
     sys.exit(1)
 
-def _process_rule(conn, duration, scope, action, granularity):
+def _process_rule(conn, duration, subdomains, action, granularity):
     _src, dst, _src_port, dst_port, proto, pid, path, args = conn
     if granularity == 'just-path':
         args = '-'
@@ -274,8 +277,8 @@ def _process_rule(conn, duration, scope, action, granularity):
             duration = 60 * minutes
         elif duration == 'forever':
             duration = None
-        if scope == 'domain':
-            dst_port = '-'
+        if subdomains == 'yes':
+            dst = '*.' + '.'.join(dst.split('.')[-2:])
         start = time.monotonic()
         _add_rule(action, duration, start, dst, dst_port, proto, path, args)
         if duration is None:
