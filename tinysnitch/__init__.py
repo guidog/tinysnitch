@@ -31,7 +31,7 @@ assert tinysnitch.lib.check_output('whoami') == 'root', 'tinysnitchd must run as
 def _log_sizes():
     while True:
         states = [tinysnitch.dns.state, tinysnitch.rules.state, tinysnitch.netfilter.state]
-        sizes = [f'{state.__module__.split(".")[-1]}.{tinysnitch.lib.yellow(k)}:{len(v)}' for state in states for k, v in state.__dict__.items() if isinstance(v, dict)]
+        sizes = [f'{state.__module__.split(".")[-1]}.{k}:{len(v)}' for state in states for k, v in state.__dict__.items() if isinstance(v, dict)]
         log(f"INFO sizes {' '.join(sizes)}")
         time.sleep(5)
     log('FATAL log sizes exited prematurely')

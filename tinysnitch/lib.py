@@ -24,10 +24,8 @@ import os
 import functools
 import traceback
 import signal
-import sys
-import time
 
-protos = {'tcp', 'udp', 'tcp-src', 'udp-src'} # *-src are used to create rules for incoming connections based on the remote src ip, since dst is always localhost
+protos = {'tcp', 'udp'}
 
 def conn(packet):
     src = packet.src
@@ -72,6 +70,3 @@ def decode(x):
         return x.decode('utf-8').rstrip('.')
     except:
         return x.rstrip()
-
-for _color, _num in zip(['red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white'], range(31, 38)):
-    locals()[_color] = functools.partial(lambda code, text: "\033[{}m{}\033[0m".format(code, text), _num)

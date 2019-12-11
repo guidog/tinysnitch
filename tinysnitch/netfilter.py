@@ -104,5 +104,7 @@ def _py_callback(id, data, size):
     # auto allow and dont double print dns packets, the only ones we track after --ctstate NEW, so that we can log the solved addr
     if tinysnitch.dns.is_inbound_dns(*conn):
         finalize('allow', conn)
+    elif tinysnitch.dns.is_local_traffic(*conn):
+        finalize('allow', conn)
     else:
         tinysnitch.rules.check(finalize, conn)

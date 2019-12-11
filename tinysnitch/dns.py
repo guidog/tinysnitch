@@ -43,6 +43,9 @@ def format(src, dst, src_port, dst_port, proto):
 def is_inbound_dns(src, dst, src_port, dst_port, proto):
     return is_localhost(dst) and src_port == 53
 
+def is_local_traffic(src, dst, src_port, dst_port, proto):
+    return is_localhost(src) and is_localhost(dst)
+
 def is_localhost(addr):
     return addr in state._localhosts
 
