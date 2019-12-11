@@ -32,13 +32,10 @@ _hosts_file = '/etc/tinysnitch.hosts'
 
 class state:
     _localhosts = set()
-    _hosts = {}
-    _new_addrs = []
+    _hosts = {} # TODO this should be collections.OrderedDict() with thread pruning to some LRU
 
 def start():
-    _populate_hosts()
     tinysnitch.lib.run_thread(_populate_localhosts)
-    tinysnitch.lib.run_thread(_persister)
 
 def format(src, dst, src_port, dst_port, proto):
     return f'{proto} | {src}:{src_port} -> {dst}:{dst_port}'
@@ -56,23 +53,11 @@ def update_hosts(packet):
             if addr:
                 state._hosts[addr] = name
                 addrs.append(addr)
-                state._new_addrs.append(addr)
         if addrs:
             log(f'INFO dns {name} {" ".join(addrs)}')
 
 def resolve(src, dst, src_port, dst_port, proto):
     return get_hostname(src), get_hostname(dst), src_port, dst_port, proto
-
-def _populate_hosts():
-    try:
-        with open(_hosts_file) as f:
-            lines = f.read().splitlines()
-    except FileNotFoundError:
-        with open(_hosts_file, 'w') as _:
-            lines = []
-    for line in lines:
-        addr, hostname = line.split()
-        state._hosts[addr] = hostname
 
 def _populate_localhosts():
     while True:
@@ -97,17 +82,3 @@ def _parse_dns(packet):
 
 def get_hostname(address):
     return state._hosts.get(address, address)
-
-def _persister():
-    while True:
-        while True:
-            with open(_hosts_file, 'a') as f:
-                try:
-                    addr = state._new_addrs.pop()
-                except IndexError:
-                    break
-                else:
-                    f.write(f'{addr} {state._hosts[addr]}\n')
-        time.sleep(1)
-    log('FATAL dns persister exited prematurely')
-    sys.exit(1)
