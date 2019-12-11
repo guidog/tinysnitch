@@ -40,10 +40,10 @@ def start():
     tinysnitch.lib.run_thread(_populate_localhosts)
     tinysnitch.lib.run_thread(_persister)
 
-def format(src, dst, src_port, dst_port, proto, pid, path, args):
-    return f'{proto} | {src}:{src_port} -> {dst}:{dst_port} | {pid} {path} | {args}'
+def format(src, dst, src_port, dst_port, proto):
+    return f'{proto} | {src}:{src_port} -> {dst}:{dst_port}'
 
-def is_inbound_dns(src, dst, src_port, dst_port, proto, pid, path, args):
+def is_inbound_dns(src, dst, src_port, dst_port, proto):
     return is_localhost(dst) and src_port == 53
 
 def is_localhost(addr):
@@ -60,8 +60,8 @@ def update_hosts(packet):
         if addrs:
             log(f'INFO dns {name} {" ".join(addrs)}')
 
-def resolve(src, dst, src_port, dst_port, proto, pid, path, args):
-    return get_hostname(src), get_hostname(dst), src_port, dst_port, proto, pid, path, args
+def resolve(src, dst, src_port, dst_port, proto):
+    return get_hostname(src), get_hostname(dst), src_port, dst_port, proto
 
 def _populate_hosts():
     try:

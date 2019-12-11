@@ -39,7 +39,6 @@ except ModuleNotFoundError:
 import tinysnitch.dns
 import tinysnitch.lib
 import tinysnitch.rules
-import tinysnitch.trace
 import scapy.layers.inet
 import time
 
@@ -47,7 +46,7 @@ class state:
     _nfq_q_handle = None
 
 NULL = ffi.NULL
-ZERO = DENY = ffi.cast('int', 0)
+ZERO = ffi.cast('int', 0)
 ONE = ffi.cast('int', 1)
 MARK = ffi.cast('int', 101285)
 
@@ -84,8 +83,8 @@ def destroy(nfq_q_handle, nfq_handle):
     if nfq_handle:
         assert lib.nfq_close(nfq_handle) == 0
 
-def _finalize(nfq, id, data, size, orig_conn, action, conn):
-    _src, _dst, _src_port, _dst_port, proto, _pid, _path, _args = conn
+def _finalize(nfq, id, data, size, action, conn):
+    _src, _dst, _src_port, _dst_port, proto = conn
     if not tinysnitch.dns.is_inbound_dns(*conn) and proto in tinysnitch.lib.protos:
         log(f'INFO {action} {tinysnitch.dns.format(*conn)}')
     if action == 'allow':
@@ -94,7 +93,6 @@ def _finalize(nfq, id, data, size, orig_conn, action, conn):
         lib.nfq_set_verdict2(nfq, id, ONE, MARK, size, data)
     else:
         assert False, f'bad action: {action}'
-    tinysnitch.trace.rm_conn(*orig_conn)
 
 @ffi.def_extern()
 def _py_callback(id, data, size):
@@ -102,28 +100,9 @@ def _py_callback(id, data, size):
     packet = scapy.layers.inet.IP(unpacked)
     tinysnitch.dns.update_hosts(packet)
     conn = tinysnitch.lib.conn(packet)
-    finalize = lambda action, new_conn: _finalize(state._nfq_q_handle, id, data, size, conn, action, new_conn)
-    resolved_conn = tinysnitch.dns.resolve(*conn)
-
-    # the fastest rule types dont require pid/path/args
-    rule = tinysnitch.rules.match_rule(*resolved_conn)
-    if rule:
-        action, _duration, _start = rule
-        finalize(action, resolved_conn)
-
+    finalize = lambda action, new_conn: _finalize(state._nfq_q_handle, id, data, size, action, new_conn)
     # auto allow and dont double print dns packets, the only ones we track after --ctstate NEW, so that we can log the solved addr
-    elif tinysnitch.dns.is_inbound_dns(*conn):
+    if tinysnitch.dns.is_inbound_dns(*conn):
         finalize('allow', conn)
-
     else:
-        # make a single attempt to add meta
-        try:
-            conn = tinysnitch.trace.add_meta(*conn)
-
-        # otherwise enqueue for delayed processing
-        except KeyError:
-            tinysnitch.rules.enqueue(finalize, conn)
-
-        # on good meta lookup, process inline
-        else:
-            tinysnitch.rules.check(finalize, conn)
+        tinysnitch.rules.check(finalize, conn)

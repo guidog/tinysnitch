@@ -32,13 +32,13 @@ protos = {'tcp', 'udp', 'tcp-src', 'udp-src'} # *-src are used to create rules f
 def conn(packet):
     src = packet.src
     dst = packet.dst
-    src_port = dst_port = proto = pid = path = args = '-'
+    src_port = dst_port = proto = '-'
     proto = packet.get_field('proto').i2s[packet.proto]
     if proto in protos:
         ip = packet['IP']
         src_port = ip.sport
         dst_port = ip.dport
-    return src, dst, src_port, dst_port, proto, pid, path, args
+    return src, dst, src_port, dst_port, proto
 
 def log(x):
     print(datetime.datetime.now().isoformat(), x, flush=True)
@@ -66,15 +66,6 @@ def exceptions_kill_parent(decoratee):
             traceback.print_exc()
             os.kill(pid, signal.SIGTERM)
     return decorated
-
-def monitor(proc):
-    while True:
-        if proc.poll() is not None:
-            log('ERROR bpftrace exited prematurely')
-            sys.exit(1)
-        time.sleep(1)
-    log('ERROR monitor exited prematurely')
-    sys.exit(1)
 
 def decode(x):
     try:

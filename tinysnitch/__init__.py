@@ -21,7 +21,6 @@ import tinysnitch.dns
 import tinysnitch.lib
 import tinysnitch.netfilter
 import tinysnitch.rules
-import tinysnitch.trace
 import os
 import sys
 import time
@@ -31,10 +30,10 @@ assert tinysnitch.lib.check_output('whoami') == 'root', 'tinysnitchd must run as
 
 def _log_sizes():
     while True:
-        states = [tinysnitch.dns.state, tinysnitch.trace.state, tinysnitch.rules.state, tinysnitch.netfilter.state]
+        states = [tinysnitch.dns.state, tinysnitch.rules.state, tinysnitch.netfilter.state]
         sizes = [f'{state.__module__.split(".")[-1]}.{tinysnitch.lib.yellow(k)}:{len(v)}' for state in states for k, v in state.__dict__.items() if isinstance(v, dict)]
         log(f"INFO sizes {' '.join(sizes)}")
-        time.sleep(2)
+        time.sleep(5)
     log('FATAL log sizes exited prematurely')
     sys.exit(1)
 
@@ -45,10 +44,9 @@ def main(rules='/etc/tinysnitch.rules'):
         for pid in trace_pids:
             print('DEBUG killing existing trace program:', tinysnitch.lib.check_output('ps', pid))
             tinysnitch.lib.check_call('sudo kill', pid)
-    if 'TINYSNITCH_LOG_SIZES' in os.environ:
+    if True: # 'TINYSNITCH_LOG_SIZES' in os.environ:
         tinysnitch.lib.run_thread(_log_sizes)
     tinysnitch.dns.start()
-    tinysnitch.trace.start()
     tinysnitch.rules.start()
     nfq_handle, nfq_q_handle = tinysnitch.netfilter.create()
     try:

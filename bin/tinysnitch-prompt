@@ -29,8 +29,8 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, words):
         self.qt_setup()
         self.duration = '9-minute'
-        self.granularity = 'just-path'
         self.subdomains = False
+        self.port = True
         self.action = 'no'
         self.help = self.legend = False
         self.text = ' '.join(words).replace('<', '&lt;').replace('>', '&gt;').split('|')
@@ -61,6 +61,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.exit()
             elif key == 68: # d
                 self.subdomains = not self.subdomains
+            elif key == 80: # p
+                self.port = not self.port
             elif key == 79: # o
                 self.duration = 'once'
             elif key == 49: # 1
@@ -69,16 +71,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.duration = '3-minutes'
             elif key == 57: # 9
                 self.duration = '9-minutes'
-            elif key == 85: # u
-                self.duration = 'until-quit'
             elif key == 70: # f
                 self.duration = 'forever'
             elif key == 72: # h
                 self.help = True
-            elif key == 65: # a
-                self.granularity = 'args-and-path'
-            elif key == 74: # j
-                self.granularity = 'just-path'
             elif key == 76: # l
                 self.legend = True
         self.update()
@@ -87,36 +83,37 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.help:
             self.title.setText('<p style="line-height: 50px;"><span style="font-weight: bold;">actions</span><br/>(y)es<br/>(n)o<br/><br/><span style="font-weight: bold;">subdomains</span><br/>(d)omain-toggle<br/><br/><span style="font-weight: bold;">granularity</span><br/>(a)rgs-and-path<br/>(j)ust-path<br/><br/><span style="font-weight: bold;">duration</span><br/>(o)nce<br/>(1)minute<br/>(3)minutes<br/>(9)minutes<br/>(u)ntil-quit<br/>(f)orever</p>') # noqa
         elif self.legend:
-            text = '\n\n'.join(['protocol', ' '.join(['src:port', '->', 'dst:port']), ' '.join(['pid', 'program']), 'args'])
+            text = '\n\n'.join(['protocol', ' '.join(['src:port', '->', 'dst:port'])])
             self.title.setText(f'<span/>{text}\n\n{"-" * 250}\n\nduration subdomains granularity\n\n(y)es (n)o (h)elp (l)egend\n\n{"-" * 250}\n\n{self.seconds} seconds until DENY'.replace('\n', '<br/>'))
         else:
             yellow = lambda x: '-' if x == '-' else f'<span style="color: rgb(220, 220, 0);">[{x}]</span>'
-            proto, target, pid, args = self.text
+            proto, target = self.text
             src, arrow, dst = target.split()
             if proto.strip().endswith('-src'):
                 a, b = src.split(':')
                 src = f'{yellow(a)}:{b}'
-                a, b = dst.split(':')
-                dst = f'{a}:{yellow(b)}'
+                if self.port:
+                    a, b = dst.split(':')
+                    dst = f'{a}:{yellow(b)}'
             else:
                 if self.subdomains and dst.split(':')[0].split('.')[-1].isalpha():
                     dst = '*.' + '.'.join(dst.split('.')[-2:])
-                dst = yellow(dst)
-
-            pid, path = pid.split()
-            path = yellow(path)
-            if self.granularity == 'args-and-path':
-                args = yellow(args.strip())
-            text = [proto, ' '.join([src, arrow, dst]), ' '.join([pid, path]), args]
+                if not self.port:
+                    a, b = dst.split(':')
+                    dst = f'{yellow(a)}:{b}'
+                else:
+                    dst = yellow(dst)
+            text = [proto, ' '.join([src, arrow, dst])]
             text = '\n\n'.join(text)
             subdomains = "yes" if self.subdomains else "no"
-            self.title.setText(f'<span/>{text}\n\n{"-" * 250}\n\n{self.duration} subdomains={subdomains} {self.granularity}\n\n(y)es (n)o (h)elp (l)egend\n\n{"-" * 250}\n\n{self.seconds} seconds until DENY'.replace('\n', '<br/>'))
+            self.title.setText(f'<span/>{text}\n\n{"-" * 250}\n\n{self.duration} subdomains={subdomains}\n\n(y)es (n)o (h)elp (l)egend\n\n{"-" * 250}\n\n{self.seconds} seconds until DENY'.replace('\n', '<br/>'))
 
     def exit(self):
         self.update()
         self.action = {'yes': 'allow', 'no': 'deny'}[self.action]
         subdomains = "yes" if self.subdomains else "no"
-        print(f'{self.duration} {subdomains} {self.action} {self.granularity}')
+        ports = "yes" if self.port else "no"
+        print(f'{self.duration} {subdomains} {self.action} {ports}')
         sys.exit(0)
 
 @argh.dispatch_command
