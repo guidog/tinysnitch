@@ -1,7 +1,3 @@
-![](gifs/example_curl.gif)
-
-![](gifs/example_firefox.gif)
-
 ## why
 
 it is suprising how many programs are making dns requests. it's even more surprising how many domains the typical website resolves. most importantly, it should be easy to monitor and control inbound and outbound connections from one's workstation.
@@ -18,24 +14,10 @@ based on the excellent [opensnitch](https://github.com/evilsock/opensnitch) and 
 
  - tinysnitchd:
    - [pypy3](https://pypy.org/)
-   - [ss](https://linux.die.net/man/8/ss)
-
- - tinysnitch-bcc-*:
-   - [bcc](https://github.com/iovisor/bcc)
-   - [python2](https://www.python.org/)
-
- - tinysnitch-bpftrace-*:
-   - [bpftrace](https://github.com/iovisor/bpftrace)
 
  - tinysnitch-prompt
    - [python3](https://www.python.org/)
    - [pyqt5](https://pypi.org/project/PyQt5/)
-
- - bcc and bpftrace can be finicky to get working. on ubuntu 19.04+ they should be available easily. on arch some combination of these should work:
-   - [bcc](https://aur.archlinux.org/packages/bcc/)
-   - [bcc-git](https://aur.archlinux.org/packages/bcc-git/)
-   - [bpftrace](https://aur.archlinux.org/packages/bpftrace/)
-   - [bpftrace-git](https://aur.archlinux.org/packages/bpftrace/)
 
 ## install
 
@@ -58,9 +40,3 @@ or automatically run it with cron: `* * * * * sudo -E auto-restart tinysnitchd 2
 ## rules
 
 rules are stored in `/etc/tinysnitch.rules`. after editing the rules file, restart `tinysnitchd` and it will be reloaded.
-
-## performance
-
-while this would not be ideal for a server, it is sufficient for workstations, allowing 10k+ connections per second implemented in either [python](https://github.com/nathants/tinysnitch/tree/pypy) or [golang](https://github.com/nathants/tinysnitch/tree/golang).
-
-python was selected to simplify implementation, since performance is adequate. the biggest bottleneck is looking up program pid, name and arguments and linking those to an open connection. bcc and bpftrace significantly improve thoughput as opposed to looking around in `/proc`. a fallback to ss is used when bpftrace misses, which happens occasionally.
