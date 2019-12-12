@@ -6,6 +6,8 @@ it is suprising how many programs are making dns requests. it's even more surpri
 
 an interactive firewall for inbound and outbound connections, with visual, keyboard controlled prompts.
 
+the firewall rules are global, but the interactive prompt always shows the pid/path/args of the program requesting the connection.
+
 based on the excellent [opensnitch](https://github.com/evilsock/opensnitch) and it's brilliant use of libnetfilter_queue.
 
 ## dependencies
