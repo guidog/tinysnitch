@@ -140,9 +140,9 @@ def _prompt(finalize, conn, prompt_conn):
         formatted = tinysnitch.dns.format(*prompt_conn)
         formatted = formatted.replace('$', '\$').replace('(', '\(').replace(')', '\)').replace('`', '\`')
         try:
-            duration, subdomains, action, ports = tinysnitch.lib.check_output(f'su {_prompt_user} -c \'DISPLAY=:0 tinysnitch-prompt "{formatted}"\' 2>/dev/null').split()
+            duration, subdomains, action, ports = tinysnitch.lib.check_output(f'su {_prompt_user} -c \'DISPLAY=:0 tinysnitch-prompt "{formatted}"\' 2>/tmp/tinysnitch_prompt.log').split()
         except:
-            log('ERROR failed to run tinysnitch-prompt')
+            log('ERROR failed to run tinysnitch-prompt\n' + tinysnitch.lib.check_output('cat /tmp/tinysnitch_prompt.log || true'))
             finalize('deny', conn)
             return 'deny'
         else:

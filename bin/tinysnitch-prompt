@@ -4,12 +4,43 @@ import sys
 from PyQt5.QtGui import QColor
 from PyQt5 import QtWidgets
 from PyQt5 import QtCore
+from PyQt5.QtCore import QThread, pyqtSignal
 import argh
+import subprocess
 
 durations = 'once', '1-minute', '3-minutes', '9-minutes', 'until-quit', 'forever'
 scopes = 'port-domain', 'domain'
-granularities = 'just-path', 'args-and-path'
 actions = 'yes', 'no'
+
+class MetaThread(QThread):
+    signal = pyqtSignal('PyQt_PyObject')
+
+    def __init__(self, src_port, dst_port):
+        super().__init__()
+        self.src_port = src_port
+        self.dst_port = dst_port
+
+    def run(self):
+        meta = ''
+        xs = subprocess.check_output(['ss', '-tupnH']).decode('utf-8').strip().splitlines()
+        for x in xs:
+            try:
+                _proto, _state, _, _, _src, _dst, program = x.split()
+            except ValueError:
+                print('ERROR bad ss line output:', [x])
+            else:
+                if self.src_port == _src.split(':')[-1] and self.dst_port == _dst.split(':')[-1]:
+                    pid = program.split('pid=')[-1].split(',')[0]
+                    try:
+                        path, *args = subprocess.check_output(f'ps --no-heading -o args {pid}', shell=True).decode('utf-8').split()
+                    except subprocess.CalledProcessError:
+                        path = program
+                        args = ''
+                    else:
+                        args = ' '.join(args)
+                    meta = f'[{pid}] {path} {args}'
+                    break
+        self.signal.emit(meta)
 
 class MainWindow(QtWidgets.QMainWindow):
     def qt_setup(self):
@@ -32,6 +63,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.subdomains = False
         self.port = True
         self.action = 'no'
+        self.meta = None
         self.help = self.legend = False
         self.text = ' '.join(words).replace('<', '&lt;').replace('>', '&gt;').split('|')
         self.seconds = 60
@@ -79,16 +111,27 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.legend = True
         self.update()
 
+    def finished(self, meta):
+        self.meta = meta
+        self.update()
+
     def update(self):
         if self.help:
-            self.title.setText('<p style="line-height: 50px;"><span style="font-weight: bold;">actions</span><br/>(y)es<br/>(n)o<br/><br/><span style="font-weight: bold;">subdomains</span><br/>(d)omain-toggle<br/><br/><span style="font-weight: bold;">granularity</span><br/>(a)rgs-and-path<br/>(j)ust-path<br/><br/><span style="font-weight: bold;">duration</span><br/>(o)nce<br/>(1)minute<br/>(3)minutes<br/>(9)minutes<br/>(u)ntil-quit<br/>(f)orever</p>') # noqa
+            self.title.setText('<p style="line-height: 50px;"><span style="font-weight: bold;">actions</span><br/>(y)es<br/>(n)o<br/><br/><span style="font-weight: bold;">granularity</span><br/>(d)omain-toggle<br/>(p)ort-toggle<br/><br/><span style="font-weight: bold;"><span style="font-weight: bold;">duration</span><br/>(o)nce<br/>(1)minute<br/>(3)minutes<br/>(9)minutes<br/>(u)ntil-quit<br/>(f)orever</p>') # noqa
         elif self.legend:
             text = '\n\n'.join(['protocol', ' '.join(['src:port', '->', 'dst:port'])])
-            self.title.setText(f'<span/>{text}\n\n{"-" * 250}\n\nduration subdomains granularity\n\n(y)es (n)o (h)elp (l)egend\n\n{"-" * 250}\n\n{self.seconds} seconds until DENY'.replace('\n', '<br/>'))
+            text += f'\n\n[pid] program args'
+            self.title.setText(f'<span/>{text}\n\n{"-" * 250}\n\nduration subdomains\n\n(y)es (n)o (h)elp (l)egend\n\n{"-" * 250}\n\n{self.seconds} seconds until DENY'.replace('\n', '<br/>'))
         else:
             yellow = lambda x: '-' if x == '-' else f'<span style="color: rgb(220, 220, 0);">[{x}]</span>'
             proto, target = self.text
             src, arrow, dst = target.split()
+            src_port = src.split(':')[-1]
+            dst_port = dst.split(':')[-1]
+            if self.meta is None:
+                self.thread = MetaThread(src_port, dst_port)
+                self.thread.signal.connect(self.finished)
+                self.thread.start()
             if proto.strip().endswith('-src'):
                 a, b = src.split(':')
                 src = f'{yellow(a)}:{b}'
@@ -105,6 +148,8 @@ class MainWindow(QtWidgets.QMainWindow):
                     dst = yellow(dst)
             text = [proto, ' '.join([src, arrow, dst])]
             text = '\n\n'.join(text)
+            if self.meta:
+                text += f'\n\n{self.meta}'
             subdomains = "yes" if self.subdomains else "no"
             self.title.setText(f'<span/>{text}\n\n{"-" * 250}\n\n{self.duration} subdomains={subdomains}\n\n(y)es (n)o (h)elp (l)egend\n\n{"-" * 250}\n\n{self.seconds} seconds until DENY'.replace('\n', '<br/>'))
 
@@ -118,6 +163,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
 @argh.dispatch_command
 def main(*words):
+    import logging
+    logging.basicConfig(level='INFO')
     app = QtWidgets.QApplication(sys.argv)
     win = MainWindow(words)
     win.show()
