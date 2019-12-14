@@ -174,6 +174,9 @@ def _process_rule(conn, duration, subdomains, action, ports):
         if '-minute' in duration:
             minutes = int(duration.split('-')[0])
             duration = 60 * minutes
+        elif '-hour' in duration:
+            hours = int(duration.split('-')[0])
+            duration = 60 * 60 * hours
         elif duration == 'forever':
             duration = None
         if subdomains == 'yes':

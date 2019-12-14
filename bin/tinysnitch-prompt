@@ -8,7 +8,7 @@ from PyQt5.QtCore import QThread, pyqtSignal
 import argh
 import subprocess
 
-durations = 'once', '1-minute', '3-minutes', '9-minutes', 'until-quit', 'forever'
+durations = 'once', '1-minute', '3-minutes', '9-minutes', '24-hours', 'forever'
 scopes = 'port-domain', 'domain'
 actions = 'yes', 'no'
 
@@ -99,6 +99,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.duration = 'once'
             elif key == 49: # 1
                 self.duration = '1-minute'
+            elif key == 50: # 2
+                self.duration = '24-hours'
             elif key == 51: # 3
                 self.duration = '3-minutes'
             elif key == 57: # 9
@@ -117,7 +119,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def update(self):
         if self.help:
-            self.title.setText('<p style="line-height: 50px;"><span style="font-weight: bold;">actions</span><br/>(y)es<br/>(n)o<br/><br/><span style="font-weight: bold;">granularity</span><br/>(d)omain-toggle<br/>(p)ort-toggle<br/><br/><span style="font-weight: bold;"><span style="font-weight: bold;">duration</span><br/>(o)nce<br/>(1)minute<br/>(3)minutes<br/>(9)minutes<br/>(u)ntil-quit<br/>(f)orever</p>') # noqa
+            self.title.setText('<p style="line-height: 50px;"><span style="font-weight: bold;">actions</span><br/>(y)es<br/>(n)o<br/><br/><span style="font-weight: bold;">granularity</span><br/>(d)omain-toggle<br/>(p)ort-toggle<br/><br/><span style="font-weight: bold;"><span style="font-weight: bold;">duration</span><br/>(o)nce<br/>(1)minute<br/>(3)minutes<br/>(9)minutes<br/>(2)4hours<br/>(f)orever</p>') # noqa
         elif self.legend:
             text = '\n\n'.join(['protocol', ' '.join(['src:port', '->', 'dst:port'])])
             text += f'\n\n[pid] program args'
