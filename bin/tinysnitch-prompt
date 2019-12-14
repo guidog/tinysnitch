@@ -27,7 +27,7 @@ class MetaThread(QThread):
             try:
                 _proto, _state, _, _, _src, _dst, program = x.split()
             except ValueError:
-                print('ERROR bad ss line output:', [x])
+                return
             else:
                 if self.src_port == _src.split(':')[-1] and self.dst_port == _dst.split(':')[-1]:
                     pid = program.split('pid=')[-1].split(',')[0]
