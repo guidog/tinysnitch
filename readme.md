@@ -1,6 +1,6 @@
 ## why
 
-it is suprising how many programs are making dns requests. it's even more surprising how many domains the typical website resolves. most importantly, it should be easy to monitor and control inbound and outbound connections from one's workstation.
+it is suprising how many programs are making dns requests. its even more surprising how many domains the typical website resolves. most importantly, it should be easy to monitor and control inbound and outbound connections from one's workstation.
 
 ## what
 
