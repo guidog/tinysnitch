@@ -56,6 +56,7 @@ def update_hosts(packet):
     if UDP in packet and DNS in packet:
         addrs = []
         for name, addr in _parse_dns(packet):
+            name = name.lower()
             if addr and name != state._hosts.get(addr):
                 state._hosts[addr] = name
                 addrs.append(addr)
