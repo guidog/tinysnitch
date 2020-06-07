@@ -112,7 +112,10 @@ def _parse_rule(line):
 def _watch_permanent_rules():
     last = None
     while True:
-        mtime = os.stat(state.rules_file).st_mtime
+        try:
+            mtime = os.stat(state.rules_file).st_mtime
+        except FileNotFoundError:
+            mtime = 0
         if last == mtime:
             time.sleep(1)
         else:
