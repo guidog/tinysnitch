@@ -1,14 +1,24 @@
 ## why
 
-it is suprising how many programs are making dns requests. its even more surprising how many domains the typical website resolves. most importantly, it should be easy to monitor and control inbound and outbound connections from one's workstation.
+it should be easy to monitor and control inbound and outbound connections.
 
 ## what
 
-an interactive firewall for inbound and outbound connections, with visual, keyboard controlled prompts.
+an interactive firewall for inbound and outbound connections.
 
-the firewall rules are global, but the interactive prompt always shows the pid/path/args of the program requesting the connection.
+the rules are global, but the prompt always shows the pid/path/args of the program requesting a new rule.
 
-based on the excellent [opensnitch](https://github.com/evilsock/opensnitch) and it's brilliant use of libnetfilter_queue.
+based on the excellent [opensnitch](https://github.com/evilsock/opensnitch).
+
+## demo
+
+![](demo.gif)
+
+![](prompt.png)
+
+![](prompt_legend.png)
+
+![](prompt_help.png)
 
 ## dependencies
 
@@ -37,8 +47,8 @@ either run it in a background terminal: `sudo -E tinysnitchd`
 
 or automatically run it with cron: `* * * * * sudo -E auto-restart tinysnitchd 2>&1 | rotate-logs /tmp/tinynitchd.log`
 
-[auto-restart](https://gist.github.com/nathants/dc5d43c1e57b9bbb3a654491df93e4d6) and [rotate-logs](https://gist.github.com/nathants/72968aaa7d9ab7c008fe32e399426d2c) are not required, but are handy.
+[auto-restart](https://gist.github.com/nathants/dc5d43c1e57b9bbb3a654491df93e4d6) and [rotate-logs](https://gist.github.com/nathants/72968aaa7d9ab7c008fe32e399426d2c) are not convenient, not required.
 
 ## rules
 
-rules are stored in `/etc/tinysnitch.rules`. after editing the rules file, restart `tinysnitchd` and it will be reloaded.
+permanent rules are stored in `/etc/tinysnitch.rules`, and `tinysnitchd` will reload the rules when edited.
