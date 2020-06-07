@@ -35,8 +35,8 @@ class state:
     _prompt_queue = queue.Queue(1024)
 
 def start():
-    _load_permanent_rules()
-    tinysnitch.lib.run_thread(_gc)
+    tinysnitch.lib.run_thread(_watch_permanent_rules)
+    tinysnitch.lib.run_thread(_gc_temporary_rules)
     tinysnitch.lib.run_thread(_process_prompt_queue)
 
 def match_rule(_src, dst, _src_port, dst_port, proto):
@@ -69,16 +69,19 @@ def check(finalize, conn):
 def _add_rule(action, duration, start, dst, dst_port, proto):
     k = dst, dst_port, proto
     v = action, duration, start
-    state._rules[k] = v
+    if state._rules.get(k) != v:
+        state._rules[k] = v
+        log(f'INFO added rule {action} {dst} {dst_port} {proto}')
 
-def _gc():
+
+def _gc_temporary_rules():
     while True:
         for k, (action, duration, start) in list(state._rules.items()):
             dst, dst_port, proto = k
             if isinstance(duration, int) and time.monotonic() - start > duration:
                 log(f'INFO gc expired rule {action} {dst} {dst_port} {proto}')
                 del state._rules[k]
-        time.sleep(3)
+        time.sleep(1)
     log('FATAL rules gc exited prematurely')
     sys.exit(1)
 
@@ -106,25 +109,43 @@ def _parse_rule(line):
         return
     return action, dst, dst_port, proto
 
-def _load_permanent_rules():
-    try:
-        with open(state.rules_file) as f:
-            lines = reversed(f.read().splitlines()) # lines at top of file are higher priority
-    except FileNotFoundError:
-        with open(state.rules_file, 'w') as f:
-            lines = []
-    i = 0
-    lines = [l.split('#')[-1] for l in lines]
-    lines = [l for l in lines if l.strip()]
-    for i, line in enumerate(lines):
+def _watch_permanent_rules():
+    last = None
+    while True:
+        mtime = os.stat(state.rules_file).st_mtime
+        if last == mtime:
+            time.sleep(1)
+        else:
+            last = mtime
+            try:
+                with open(state.rules_file) as f:
+                    lines = reversed(f.read().splitlines()) # lines at top of file are higher priority and overwrite later entries
+            except FileNotFoundError:
+                with open(state.rules_file, 'w') as f:
+                    lines = []
+            lines = [l.split('#')[-1] for l in lines]
+            lines = [l for l in lines if l.strip()]
+            new_rules = _upsert_permanent_rules(lines)
+            _gc_permanent_rules(new_rules)
+
+def _gc_permanent_rules(new_rules):
+    for rule in list(state._rules):
+        dst, dst_port, proto = rule
+        action, duration, start = state._rules.get(rule, ('', '', ''))
+        if rule not in new_rules and duration is None:
+            state._rules.pop(rule)
+            log(f'INFO removed rule {action} {dst} {dst_port} {proto}')
+
+def _upsert_permanent_rules(lines):
+    rules = set()
+    for line in lines:
         rule = _parse_rule(line)
         if rule:
             action, dst, dst_port, proto = rule
             duration = start = None
             _add_rule(action, duration, start, dst, dst_port, proto)
-            log(f'INFO loaded rule {action} {dst} {dst_port} {proto}')
-    if list(lines):
-        log(f'INFO loaded {i + 1} rules from {state.rules_file}')
+            rules.add((dst, dst_port, proto))
+    return rules
 
 def _prompt(finalize, conn, prompt_conn):
     # we match rule again here in case a rule was added while this conn was waiting in the queue
@@ -144,7 +165,7 @@ def _prompt(finalize, conn, prompt_conn):
             duration, subdomains, action, ports = output.split()
         except ValueError:
             log(f'output: {output}')
-            log(f'FATAL failed to run tinysnitch-prompt\n' + tinysnitch.lib.check_output('cat /tmp/tinysnitch_prompt.log || true'))
+            log('FATAL failed to run tinysnitch-prompt\n' + tinysnitch.lib.check_output('cat /tmp/tinysnitch_prompt.log || true'))
             sys.exit(1)
         else:
             action = _process_rule(conn, duration, subdomains, action, ports)
