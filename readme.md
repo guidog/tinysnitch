@@ -8,7 +8,7 @@ an interactive firewall for inbound and outbound connections.
 
 the rules are global, but the prompt always shows the pid/path/args of the program requesting a new rule.
 
-based on the excellent [opensnitch](https://github.com/evilsock/opensnitch).
+based on the excellent [opensnitch](https://github.com/evilsocket/opensnitch).
 
 ## demo
 
