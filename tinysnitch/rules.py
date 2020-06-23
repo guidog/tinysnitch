@@ -20,6 +20,7 @@
 import traceback
 import tinysnitch.lib
 import os
+import stat
 import queue
 import sys
 import time
@@ -31,10 +32,12 @@ _actions = {'allow', 'deny'}
 
 class state:
     rules_file = None
+    temp_rules_file = None
     _rules = {}
     _prompt_queue = queue.Queue(1024)
 
 def start():
+    tinysnitch.lib.run_thread(_watch_temp_rules)
     tinysnitch.lib.run_thread(_watch_permanent_rules)
     tinysnitch.lib.run_thread(_gc_temporary_rules)
     tinysnitch.lib.run_thread(_process_prompt_queue)
@@ -73,7 +76,6 @@ def _add_rule(action, duration, start, dst, dst_port, proto):
         state._rules[k] = v
         log(f'INFO added rule {action} {dst} {dst_port} {proto}')
 
-
 def _gc_temporary_rules():
     while True:
         for k, (action, duration, start) in list(state._rules.items()):
@@ -108,6 +110,28 @@ def _parse_rule(line):
         log(f'ERROR bad action, should be one of {_actions}, was {action}')
         return
     return action, dst, dst_port, proto
+
+def _watch_temp_rules():
+    if not os.path.isfile(state.temp_rules_file):
+        open(state.temp_rules_file, 'w').close()
+    os.chmod(state.temp_rules_file, stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH | stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH)
+    with open(state.temp_rules_file) as f:
+        while True:
+            line = f.readline().rstrip()
+            if not line:
+                time.sleep(.5)
+            else:
+                try:
+                    duration, _line = line.split(None, 1)
+                    duration_amount, duration_unit = duration.split('-')
+                    assert duration_amount.isdigit()
+                    assert duration_unit in {'hour', 'minute'}
+                    start = time.monotonic()
+                    action, dst, dst_port, proto = _parse_rule(_line)
+                    _add_rule(action, duration, start, dst, dst_port, proto)
+                    log(f'INFO add temporary rule {action} {duration} {dst} {dst_port} {proto}')
+                except:
+                    log(f'INFO bad temp rule: {line}')
 
 def _watch_permanent_rules():
     last = None
@@ -203,6 +227,8 @@ def _process_rule(conn, duration, subdomains, action, ports):
             duration = 60 * 60 * hours
         elif duration == 'forever':
             duration = None
+        else:
+            assert False, _duration
         if subdomains == 'yes':
             dst = '*.' + '.'.join(dst.split('.')[-2:])
         start = time.monotonic()

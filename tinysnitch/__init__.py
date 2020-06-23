@@ -37,8 +37,9 @@ def _log_sizes():
     log('FATAL log sizes exited prematurely')
     sys.exit(1)
 
-def main(rules='/etc/tinysnitch.rules'):
+def main(rules='/etc/tinysnitch.rules', temp_rules='/tmp/tinysnitch.temp'):
     tinysnitch.rules.state.rules_file = rules
+    tinysnitch.rules.state.temp_rules_file = temp_rules
     trace_pids = tinysnitch.lib.check_output('ps -ef | grep "bin/tinysnitch\-b" | grep -v grep | awk "{print \$2}"').splitlines()
     if trace_pids:
         for pid in trace_pids:
