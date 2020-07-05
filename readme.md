@@ -30,6 +30,7 @@ a split screen monitoring setup for a second monitor using [ptop](https://github
 
  - tinysnitchd:
    - [pypy3](https://pypy.org/)
+   - [libnetfilter_queue](https://www.archlinux.org/packages/extra/x86_64/libnetfilter_queue/)
 
  - tinysnitch-prompt
    - [python3](https://www.python.org/)

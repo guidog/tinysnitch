@@ -60,9 +60,11 @@ def exceptions_kill_parent(decoratee):
             return decoratee(*a, **kw)
         except SystemExit:
             os.kill(pid, signal.SIGTERM)
+            raise
         except:
             traceback.print_exc()
             os.kill(pid, signal.SIGTERM)
+            raise
     return decorated
 
 def decode(x):
