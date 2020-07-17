@@ -12,13 +12,13 @@ based on the excellent [opensnitch](https://github.com/evilsocket/opensnitch).
 
 ## demo
 
-![](demo.gif)
+![](https://github.com/nathants/tinysnitch/raw/master/demo.gif)
 
-![](prompt.png)
+![](https://github.com/nathants/tinysnitch/raw/master/prompt.png)
 
-![](prompt_legend.png)
+![](https://github.com/nathants/tinysnitch/raw/master/prompt_legend.png)
 
-![](prompt_help.png)
+![](https://github.com/nathants/tinysnitch/raw/master/prompt_help.png)
 
 a split screen monitoring setup for a second monitor using [ptop](https://github.com/nathants/ptop), [color](https://gist.github.com/nathants/336bc5e501ad174aeeb7986f2b0633e4), [pys](https://gist.github.com/nathants/741b066af9faa15f3ed50ed6cf677d67), and a [oneliner](https://gist.github.com/nathants/daa1aa0dee88bc6dc8710c82965b4704) to tail tinysnitch logs into a small and colorful format.
 
