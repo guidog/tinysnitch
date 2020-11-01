@@ -112,8 +112,7 @@ def _parse_rule(line):
     return action, dst, dst_port, proto
 
 def _watch_temp_rules():
-    if not os.path.isfile(state.temp_rules_file):
-        open(state.temp_rules_file, 'w').close()
+    open(state.temp_rules_file, 'w').close()
     os.chmod(state.temp_rules_file, stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH | stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH)
     with open(state.temp_rules_file) as f:
         while True:
