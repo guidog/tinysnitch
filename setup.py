@@ -5,5 +5,5 @@ setuptools.setup(
     name="tinysnitch",
     packages=['tinysnitch'],
     license='GPL',
-    install_requires=['argh', 'scapy']
+    install_requires=['argh', 'scapy', 'dnslib']
 )

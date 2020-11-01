@@ -21,24 +21,23 @@
 # or write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
+import dnslib
 import sys
 import time
 import tinysnitch.lib
-from scapy.layers.dns import DNS
-from scapy.layers.inet import UDP
 from tinysnitch.lib import log
 
-_hosts_file = '/etc/tinysnitch.hosts'
+_dns_file = '/etc/tinysnitch.hosts'
 
 class state:
     _localhosts = set()
     _hosts = {} # TODO this should be collections.OrderedDict() with thread pruning to some LRU
-    _new_addrs = []
+    _dns_to_log = []
 
 def start():
     _populate_hosts()
-    tinysnitch.lib.run_thread(_populate_localhosts)
-    tinysnitch.lib.run_thread(_persister)
+    tinysnitch.lib.run_thread(_localhost_watcher)
+    tinysnitch.lib.run_thread(_dns_logger)
 
 def format(src, dst, src_port, dst_port, proto):
     return f'{proto} | {src}:{src_port} -> {dst}:{dst_port}'
@@ -53,21 +52,18 @@ def is_localhost(addr):
     return addr in state._localhosts
 
 def update_hosts(packet):
-    if UDP in packet and DNS in packet:
-        addrs = []
-        for name, addr in _parse_dns(packet):
-            name = name.lower()
-            if addr and name != state._hosts.get(addr):
-                state._hosts[addr] = name
-                addrs.append(addr)
-                state._new_addrs.append(addr)
-        if addrs:
-            log(f'INFO dns {name} {" ".join(addrs)}')
+    addrs = []
+    for name, addr in _parse_dns(packet):
+        if name != state._hosts.get(addr):
+            # log(f'INFO dns {name} {addr}')
+            state._dns_to_log.append((name, addr))
+        state._hosts[addr] = name
+        addrs.append(addr)
 
 def resolve(src, dst, src_port, dst_port, proto):
     return get_hostname(src), get_hostname(dst), src_port, dst_port, proto
 
-def _populate_localhosts():
+def _localhost_watcher():
     while True:
         for line in tinysnitch.lib.check_output('ip a | grep inet').splitlines() + ['- localhost -']:
             _, addr, *_ = line.strip().split()
@@ -79,39 +75,50 @@ def _populate_localhosts():
     sys.exit(1)
 
 def _parse_dns(packet):
-    udp = packet['UDP']
-    dns = packet['DNS']
-    if int(udp.dport) == 53:
-        yield tinysnitch.lib.decode(dns.qd.qname), None
-    elif int(udp.sport) == 53:
-        for i in range(dns.ancount):
-            dnsrr = dns.an[i]
-            yield tinysnitch.lib.decode(dnsrr.rrname), tinysnitch.lib.decode(dnsrr.rdata)
+    try:
+        udp = packet['UDP']
+    except IndexError:
+        return
+    else:
+        if int(udp.sport) == 53:
+            cnames = set()
+            anames = set()
+            addrs = set()
+            dns = dnslib.DNSRecord.parse(packet['Raw'])
+            for rr in dns.rr:
+                if rr.rtype == 5: # CNAME
+                    cnames.add(str(rr.rname).rstrip('. '))
+                elif rr.rtype == 1: # A
+                    anames.add(str(rr.rname).rstrip('. '))
+                    addrs.add(str(rr.rdata))
+            for name in cnames or anames:
+                for addr in addrs:
+                    yield name, addr
 
 def get_hostname(address):
     return state._hosts.get(address, address)
 
 def _populate_hosts():
     try:
-        with open(_hosts_file) as f:
+        with open(_dns_file) as f:
             lines = f.read().splitlines()
     except FileNotFoundError:
-        with open(_hosts_file, 'w') as _:
+        with open(_dns_file, 'w') as _:
             lines = []
     for line in lines:
-        addr, hostname = line.split()
-        state._hosts[addr] = hostname
+        name, addr = line.split()
+        state._hosts[addr] = name
 
-def _persister():
+def _dns_logger():
     while True:
         while True:
-            with open(_hosts_file, 'a') as f:
+            with open(_dns_file, 'a') as f:
                 try:
-                    addr = state._new_addrs.pop()
+                    name, addr = state._dns_to_log.pop()
                 except IndexError:
                     break
                 else:
-                    f.write(f'{addr} {state._hosts[addr]}\n')
+                    f.write(f'{name} {addr}\n')
         time.sleep(1)
     log('FATAL dns persister exited prematurely')
     sys.exit(1)
