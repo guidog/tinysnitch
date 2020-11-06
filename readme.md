@@ -1,3 +1,5 @@
+# tinysnitch
+
 ## why
 
 it should be easy to monitor and control inbound and outbound connections.
