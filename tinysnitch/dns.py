@@ -21,6 +21,7 @@
 # or write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
+import traceback
 import dnslib
 import sys
 import time
@@ -57,8 +58,8 @@ def is_localhost(addr):
 def update_hosts(packet):
     addrs = []
     for name, addr in _parse_dns(packet):
+        log(f'INFO dns {name} {addr}')
         if name != state._hosts.get(addr):
-            # log(f'INFO dns {name} {addr}')
             state._dns_to_log.append((name, addr))
         state._hosts[addr] = name
         addrs.append(addr)
@@ -77,17 +78,27 @@ def _localhost_watcher():
     print('fatal: populate hosts exited prematurely')
     sys.exit(1)
 
+
 def _parse_dns(packet):
     try:
-        udp = packet['UDP']
+        p = packet['UDP']
+    except IndexError:
+        p = packet['TCP']
+    if not (p.sport == 53 or p.dport == 53):
+        return
+    try:
+        raw = p['Raw']
     except IndexError:
         return
     else:
-        if int(udp.sport) == 53:
+        try:
+            dns = dnslib.DNSRecord.parse(raw)
+        except:
+            traceback.print_exc()
+        else:
             cnames = set()
             anames = set()
             addrs = set()
-            dns = dnslib.DNSRecord.parse(packet['Raw'])
             for rr in dns.rr:
                 if rr.rtype == 5: # CNAME
                     cnames.add(str(rr.rname).rstrip('. '))
