@@ -21,6 +21,7 @@
 # or write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
+from typing import Set, Dict, List, Tuple
 import traceback
 import dnslib
 import sys
@@ -31,9 +32,9 @@ from tinysnitch.lib import log
 _dns_file = '/etc/tinysnitch.hosts'
 
 class state:
-    _localhosts = set()
-    _hosts = {} # TODO this should be collections.OrderedDict() with thread pruning to some LRU
-    _dns_to_log = []
+    _localhosts: Set[str] = set()
+    _hosts: Dict[str, str] = {} # TODO this should LRU cache
+    _dns_to_log: List[Tuple[str, str]] = []
 
 def start():
     _populate_hosts()
@@ -77,7 +78,6 @@ def _localhost_watcher():
         time.sleep(5)
     print('fatal: populate hosts exited prematurely')
     sys.exit(1)
-
 
 def _parse_dns(packet):
     try:

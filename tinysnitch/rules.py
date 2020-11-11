@@ -17,6 +17,7 @@
 # or write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
+from typing import Dict, Tuple, Optional
 import traceback
 import tinysnitch.lib
 import os
@@ -33,8 +34,8 @@ _actions = {'allow', 'deny'}
 class state:
     rules_file = None
     temp_rules_file = None
-    _rules = {}
-    _prompt_queue = queue.Queue(1024)
+    _rules: Dict[Tuple[str, str, str], Tuple[str, str, Optional[int]]] = {}
+    _prompt_queue: queue.Queue = queue.Queue(1024)
 
 def start():
     tinysnitch.lib.run_thread(_watch_temp_rules)
@@ -157,7 +158,7 @@ def _watch_permanent_rules():
 def _gc_permanent_rules(new_rules):
     for rule in list(state._rules):
         dst, dst_port, proto = rule
-        action, duration, start = state._rules.get(rule, ('', '', ''))
+        action, duration, start = state._rules.get(rule, ('', '', 0))
         if rule not in new_rules and duration is None:
             state._rules.pop(rule)
             log(f'INFO removed rule {action} {dst} {dst_port} {proto}')

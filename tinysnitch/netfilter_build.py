@@ -23,6 +23,8 @@
 #
 # based on: https://github.com/evilsocket/tinysnitch/blob/5c8f7102c29caf94e967f8433a68b861a4b1666f/daemon/netfilter/queue.h
 
+# type: ignore
+
 from cffi import FFI
 ffibuilder = FFI()
 
