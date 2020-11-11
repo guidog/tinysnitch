@@ -49,11 +49,21 @@ def match_rule(_src, dst, _src_port, dst_port, proto):
     else:
         dst_wildcard_subdomains = '*.' + '.'.join(dst.split('.')[-2:])
         keys = [
-            (dst, dst_port, proto),
-            (dst, '-', proto),
+            (dst,                     dst_port, proto),
+            (dst,                     '-',      proto),
             (dst_wildcard_subdomains, dst_port, proto),
-            (dst_wildcard_subdomains, '-', proto),
+            (dst_wildcard_subdomains, '-',      proto),
         ]
+        if dst.replace('.', '').isdigit():
+            a, b, c, d = dst.split('.')
+            keys += [
+                (f'{a}.{b}.{c}.*', dst_port, proto),
+                (f'{a}.{b}.*.*',   dst_port, proto),
+                (f'{a}.*.*.*',     dst_port, proto),
+                (f'{a}.{b}.{c}.*', '-',      proto),
+                (f'{a}.{b}.*.*',   '-',      proto),
+                (f'{a}.*.*.*',     '-',      proto),
+            ]
         for k in keys:
             try:
                 return state._rules[k]
