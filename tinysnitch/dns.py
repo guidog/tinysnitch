@@ -80,10 +80,13 @@ def _localhost_watcher():
     sys.exit(1)
 
 def _parse_dns(packet):
-    try:
+    if 'UDP' in packet:
         p = packet['UDP']
-    except IndexError:
+    elif 'TCP' in packet:
         p = packet['TCP']
+    else:
+        log('failed to parse dns for:', packet)
+        return
     if not (p.sport == 53 or p.dport == 53):
         return
     try:
