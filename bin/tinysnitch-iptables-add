@@ -8,3 +8,7 @@ sudo iptables -I OUTPUT -t mangle -m conntrack --ctstate NEW -j NFQUEUE --queue-
 sudo iptables -I INPUT -t mangle -m conntrack --ctstate NEW -j NFQUEUE --queue-num 0  # potentially block outgoing traffic
 sudo iptables -I INPUT -m mark --mark 101285 -j REJECT                                # inbound rejection mark
 sudo iptables -I OUTPUT -m mark --mark 101285 -j REJECT                               # outbound rejection mark
+
+sudo ip6tables -I INPUT -j REJECT --reject-with icmp6-port-unreachable   # reject all ipv6
+sudo ip6tables -I OUTPUT -j REJECT --reject-with icmp6-port-unreachable  # reject all ipv6
+sudo ip6tables -I FORWARD -j REJECT --reject-with icmp6-port-unreachable # reject all ipv6
