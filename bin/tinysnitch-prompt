@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import time
 import os
 import sys
 from PyQt5.QtGui import QColor
@@ -7,6 +8,9 @@ from PyQt5 import QtCore
 from PyQt5.QtCore import QThread, pyqtSignal
 import argh
 import subprocess
+
+# slight delay before accepting user input to avoid accidental y/n response
+delay_seconds = float(os.environ.get('TINYSNITCH_DELAY_SECONDS', '.5'))
 
 durations = 'once', '1-minute', '3-minutes', '9-minutes', '24-hours', 'forever'
 scopes = 'port-domain', 'domain'
@@ -59,6 +63,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def __init__(self, words):
         self.qt_setup()
+        self.start = time.monotonic()
         self.duration = '9-minute'
         self.subdomains = False
         self.port = True
@@ -80,6 +85,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.update()
 
     def keyPressEvent(self, event, **kw):
+        if time.monotonic() - self.start < delay_seconds:
+            return
         key = event.key()
         if self.help or self.legend:
             self.help = self.legend = False
