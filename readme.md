@@ -46,7 +46,7 @@ put `tinysnitch/bin` on your `$PATH`.
 
 add the iptable rules with: `tinysnitch-iptables-add`
 
-you probably want to save those rules and have them loaded on [system startup](https://wiki.archlinux.org/index.php/iptables#Configuration_and_usage).
+you probably want to save those rules and have them loaded on [system startup](https://wiki.archlinux.org/index.php/iptables#Configuration_and_usage). make sure to do this with both `iptables-restore` and `ip6tables-restore`.
 
 tinysnitchd must be launched with sudo as a user process, so the subprocess pyqt5 prompts can actually show up on your screen.
 
