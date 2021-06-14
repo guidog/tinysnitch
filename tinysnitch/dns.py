@@ -85,7 +85,6 @@ def _parse_dns(packet):
     elif 'TCP' in packet:
         p = packet['TCP']
     else:
-        log(f'failed to parse dns for: {packet}')
         return
     if not (p.sport == 53 or p.dport == 53):
         return
