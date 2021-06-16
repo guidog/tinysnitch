@@ -30,6 +30,7 @@ from tinysnitch.lib import log
 assert '1' == tinysnitch.lib.check_output('ls /home | wc -l') or 'TINYSNITCH_PROMPT_USER' in os.environ, 'in a multi-user environment please specify the user to display X11 prompts as via env variable $TINYSNITCH_PROMPT_USER'
 _prompt_user = os.environ.get('TINYSNITCH_PROMPT_USER', tinysnitch.lib.check_output('ls /home | head -n1'))
 _actions = {'allow', 'deny'}
+_ephemeral_port_low, _ephemeral_port_high = [int(port) for port in tinysnitch.lib.check_output('cat /proc/sys/net/ipv4/ip_local_port_range').split()]
 
 class state:
     rules_file = None
@@ -43,10 +44,12 @@ def start():
     tinysnitch.lib.run_thread(_gc_temporary_rules)
     tinysnitch.lib.run_thread(_process_prompt_queue)
 
-def match_rule(_src, dst, _src_port, dst_port, proto):
+def match_rule(src, dst, src_port, dst_port, proto):
     if proto not in tinysnitch.lib.protos:
         return 'allow', None, None # allow all non tcp/udp
     else:
+        if tinysnitch.dns.is_localhost(dst) and _ephemeral_port_low <= dst_port <= _ephemeral_port_high:
+            src, dst, src_port, dst_port = dst, src, dst_port, src_port # check return traffic on ephemeral ports as is it were outbound traffic
         dst_wildcard_subdomains = '*.' + '.'.join(dst.split('.')[-2:])
         keys = [
             (dst,                     dst_port, proto),
