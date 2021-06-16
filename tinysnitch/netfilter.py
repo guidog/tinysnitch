@@ -87,7 +87,7 @@ def destroy(nfq_q_handle, nfq_handle):
 
 def _finalize(nfq, id, data, size, action, conn):
     _src, _dst, _src_port, _dst_port, proto = conn
-    if not tinysnitch.dns.is_inbound_dns(*conn) and not tinysnitch.dns.is_outbound_dns(*conn):
+    if tinysnitch.dns.should_log(*conn):
         log(f'INFO {action} {tinysnitch.dns.format(*conn)}')
     if action == 'allow':
         lib.nfq_set_verdict(nfq, id, ONE, ZERO, NULL)

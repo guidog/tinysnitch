@@ -46,6 +46,16 @@ def start():
 def format(src, dst, src_port, dst_port, proto):
     return f'{proto} | {src}:{src_port} -> {dst}:{dst_port}'
 
+def should_log(*conn):
+    return (
+        not is_inbound_dns(*conn)
+        and not is_outbound_dns(*conn)
+        and not is_icmp(*conn)
+    )
+
+def is_icmp(src, dst, src_port, dst_port, proto):
+    return proto == 'icmp'
+
 def is_inbound_dns(src, dst, src_port, dst_port, proto):
     return is_localhost(dst) and src_port == 53
 
