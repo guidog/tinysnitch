@@ -105,8 +105,7 @@ def _parse_rule(line):
     try:
         action, dst, dst_port, proto = line.split(None, 3)
     except ValueError:
-        log(f'ERROR invalid rule, should have been "action dst dst_port proto", was {line}')
-        traceback.print_exc()
+        log(f'ERROR invalid rule, should have been "action dst dst_port proto", was {line}\n{traceback.format_exc()}')
         return
     try:
         if dst_port != '-':
