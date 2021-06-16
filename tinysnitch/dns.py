@@ -26,6 +26,8 @@ import traceback
 import dnslib
 import sys
 import time
+import uuid
+import pickle
 import tinysnitch.lib
 from tinysnitch.lib import log
 
@@ -96,7 +98,10 @@ def _parse_dns(packet):
         try:
             dns = dnslib.DNSRecord.parse(raw)
         except:
-            traceback.print_exc()
+            debug = f'/tmp/dns.fail.{uuid.uuid4()}.pkl'
+            with open(debug, 'wb') as f:
+                f.write(pickle.dumps(raw))
+            log(f'dumped raw dns failure packet to: {debug}\n{traceback.format_exc()}')
         else:
             cnames = set()
             anames = set()
