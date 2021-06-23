@@ -66,8 +66,9 @@ static int nf_callback(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct n
     unsigned char *buffer = NULL;
     struct nfqnl_msg_packet_hdr *ph = nfq_get_msg_packet_hdr(nfa);
     unsigned int id = ntohl(ph->packet_id);
-    unsigned int size = nfq_get_payload(nfa, &buffer);
-    _py_callback(id, buffer, size);
+    int size = nfq_get_payload(nfa, &buffer);
+    if (size > 0)
+        _py_callback(id, buffer, size);
 }
 
 static inline struct nfq_q_handle* create_queue(struct nfq_handle *h, unsigned int queue, unsigned int idx) {
