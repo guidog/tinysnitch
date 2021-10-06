@@ -25,6 +25,7 @@ import stat
 import queue
 import sys
 import time
+import uuid
 from tinysnitch.lib import log
 
 assert '1' == tinysnitch.lib.check_output('ls /home | wc -l') or 'TINYSNITCH_PROMPT_USER' in os.environ, 'in a multi-user environment please specify the user to display X11 prompts as via env variable $TINYSNITCH_PROMPT_USER'
@@ -125,25 +126,28 @@ def _parse_rule(line):
     return action, dst, dst_port, proto
 
 def _watch_temp_rules():
-    open(state.temp_rules_file, 'w').close()
-    os.chmod(state.temp_rules_file, stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH | stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH)
-    with open(state.temp_rules_file) as f:
-        while True:
-            line = f.readline().rstrip()
-            if not line:
-                time.sleep(.5)
-            else:
-                try:
-                    duration, _line = line.split(None, 1)
-                    duration_amount, duration_unit = duration.split('-')
-                    assert duration_amount.isdigit()
-                    assert duration_unit in {'hour', 'minute'}
-                    start = time.monotonic()
-                    action, dst, dst_port, proto = _parse_rule(_line)
-                    _add_rule(action, duration, start, dst, dst_port, proto)
-                    log(f'INFO add temporary rule {action} {duration} {dst} {dst_port} {proto}')
-                except:
-                    log(f'INFO bad temp rule: {line}')
+    while True:
+        tempfile = f'/tmp/{uuid.uuid4()}'
+        try:
+            os.rename(state.temp_rules_file, tempfile)
+        except FileNotFoundError:
+            time.sleep(1)
+        else:
+            with open(tempfile) as f:
+                for line in f:
+                    line = line.rstrip()
+                    try:
+                        duration, _line = line.split(None, 1)
+                        duration_amount, duration_unit = duration.split('-')
+                        assert duration_amount.isdigit()
+                        assert duration_unit in {'hour', 'minute'}
+                        start = time.monotonic()
+                        action, dst, dst_port, proto = _parse_rule(_line)
+                        _add_rule(action, duration, start, dst, dst_port, proto)
+                        log(f'INFO add temporary rule {action} {duration} {dst} {dst_port} {proto}')
+                    except:
+                        log(f'INFO bad temp rule: {line}')
+            os.remove(tempfile)
 
 def _watch_permanent_rules():
     last = None
