@@ -14,25 +14,26 @@ based on the excellent [opensnitch](https://github.com/evilsocket/opensnitch).
 
 ## demo
 
-![](https://github.com/nathants/tinysnitch/raw/master/demo.gif)
+![](https://github.com/nathants/tinysnitch/raw/master/docs/demo.gif)
 
-![](https://github.com/nathants/tinysnitch/raw/master/prompt.png)
+![](https://github.com/nathants/tinysnitch/raw/master/docs/prompt.png)
 
-![](https://github.com/nathants/tinysnitch/raw/master/prompt_legend.png)
+![](https://github.com/nathants/tinysnitch/raw/master/docs/prompt_legend.png)
 
-![](https://github.com/nathants/tinysnitch/raw/master/prompt_help.png)
+![](https://github.com/nathants/tinysnitch/raw/master/docs/prompt_help.png)
 
 a split screen monitoring setup for a second monitor using [ptop](https://github.com/nathants/ptop), [color](https://gist.github.com/nathants/336bc5e501ad174aeeb7986f2b0633e4), [pys](https://gist.github.com/nathants/741b066af9faa15f3ed50ed6cf677d67), and a [oneliner](https://gist.github.com/nathants/daa1aa0dee88bc6dc8710c82965b4704) to tail tinysnitch logs into a small and colorful format.
 
-![](https://github.com/nathants/tinysnitch/raw/master/demo.png)
+![](https://github.com/nathants/tinysnitch/raw/master/docs/demo.png)
 
 ## dependencies
 
- - everything in `tinysnitch/bin` is a separate component, with separate dependencies. you can run them independently to make sure dependencies are correctly installed.
+ there are two components with separate dependencies:
 
  - tinysnitchd:
    - [pypy3](https://pypy.org/)
    - [libnetfilter_queue](https://www.archlinux.org/packages/extra/x86_64/libnetfilter_queue/)
+   - [nftables](https://archlinux.org/packages/extra/x86_64/nftables/)
 
  - tinysnitch-prompt
    - [python3](https://www.python.org/)
@@ -40,13 +41,11 @@ a split screen monitoring setup for a second monitor using [ptop](https://github
 
 ## install
 
+setup nftables with `sudo nft -f nftables.conf`
+
 put `tinysnitch/bin` on your `$PATH`.
 
 ## usage
-
-add the iptable rules with: `tinysnitch-iptables-add`
-
-you probably want to save those rules and have them loaded on [system startup](https://wiki.archlinux.org/index.php/iptables#Configuration_and_usage). make sure to do this with both `iptables-restore` and `ip6tables-restore`.
 
 tinysnitchd must be launched with sudo as a user process, so the subprocess pyqt5 prompts can actually show up on your screen.
 

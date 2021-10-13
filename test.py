@@ -51,7 +51,6 @@ while True:
 
 def setup_module():
     assert co('sudo whoami') == 'root'
-    cc('tinysnitch-iptables-add')
     with open('/tmp/tinysnitch_test_udp_client.py', 'w') as f:
         f.write(udp_client)
     with open('/tmp/tinysnitch_test_udp_server.py', 'w') as f:
