@@ -49,8 +49,10 @@ def format(src, dst, src_port, dst_port, proto):
 def should_log(*conn):
     return (
         not is_inbound_dns(*conn)
-        and not is_outbound_dns(*conn)
         and not is_icmp(*conn)
+        and not is_udp_loopback(*conn)
+        # and not is_outbound_dns(*conn)
+        # and not is_local_traffic(*conn)
     )
 
 def is_icmp(src, dst, src_port, dst_port, proto):
@@ -64,6 +66,9 @@ def is_outbound_dns(src, dst, src_port, dst_port, proto):
 
 def is_local_traffic(src, dst, src_port, dst_port, proto):
     return is_localhost(src) and is_localhost(dst)
+
+def is_udp_loopback(src, dst, src_port, dst_port, proto):
+    return src == dst and src_port == dst_port and proto == "udp"
 
 def is_localhost(addr):
     return addr in state._localhosts

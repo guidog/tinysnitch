@@ -103,10 +103,15 @@ def _py_callback(id, data, size):
     tinysnitch.dns.update_hosts(packet)
     conn = tinysnitch.lib.conn(packet)
     finalize = lambda action, new_conn: _finalize(state._nfq_q_handle, id, data, size, action, new_conn)
-    # auto allow and dont double print dns packets, the only ones we track after --ctstate NEW, so that we can log the solved addr
+
+    # auto accept dns responses; TODO map outbound ports to inbound ports instead of accepting anything from remote:udp:53
     if tinysnitch.dns.is_inbound_dns(*conn):
         finalize('allow', conn)
-    elif tinysnitch.dns.is_local_traffic(*conn):
+
+    # some udp traffic gets queue in a strange loopback mode, accept it
+    elif tinysnitch.dns.is_udp_loopback(*conn):
         finalize('allow', conn)
+
+    # run the firewall checks
     else:
         tinysnitch.rules.check(finalize, conn)
