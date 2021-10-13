@@ -40,11 +40,6 @@ def _log_sizes():
 def main(rules='/etc/tinysnitch.rules', temp_rules='/tmp/tinysnitch.temp'):
     tinysnitch.rules.state.rules_file = rules
     tinysnitch.rules.state.temp_rules_file = temp_rules
-    trace_pids = tinysnitch.lib.check_output('ps -ef | grep "bin/tinysnitch\-b" | grep -v grep | awk "{print \$2}"').splitlines()
-    if trace_pids:
-        for pid in trace_pids:
-            print('DEBUG killing existing trace program:', tinysnitch.lib.check_output('ps', pid))
-            tinysnitch.lib.check_call('sudo kill', pid)
     if 'TINYSNITCH_LOG_SIZES' in os.environ:
         tinysnitch.lib.run_thread(_log_sizes)
     tinysnitch.dns.start()
