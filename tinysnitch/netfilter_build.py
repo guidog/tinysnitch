@@ -44,7 +44,6 @@ int nfq_set_mode (struct nfq_q_handle *qh, uint8_t mode, uint32_t range);
 int nfq_fd (struct nfq_handle *h);
 int nfq_destroy_queue (struct nfq_q_handle *qh);
 int nfq_set_verdict (struct nfq_q_handle *qh, uint32_t id, uint32_t verdict, uint32_t data_len, const unsigned char *buf);
-int nfq_set_verdict2 (struct nfq_q_handle *qh, uint32_t id, uint32_t verdict, uint32_t mark, uint32_t data_len, const unsigned char *buf);
 """)
 
 ffibuilder.set_source(
@@ -55,10 +54,6 @@ ffibuilder.set_source(
 #include <errno.h>
 #include <netinet/in.h>
 #include <libnetfilter_queue/libnetfilter_queue.h>
-
-#define NF_MARK 101285
-#define NF_ACCEPT 1
-#define NF_REPEAT 4
 
 static void _py_callback(unsigned int id, unsigned char* data, unsigned int len);
 

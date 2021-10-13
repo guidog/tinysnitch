@@ -49,7 +49,11 @@ class state:
 
 NULL = ffi.NULL
 ZERO = ffi.cast('int', 0)
-ONE = ffi.cast('int', 1)
+
+NF_DROP = ffi.cast('int', 0)
+NF_ACCEPT = ffi.cast('int', 1)
+NF_REPEAT = ffi.cast('int', 4)
+
 MARK = ffi.cast('int', 101285)
 
 _AF_INET = ffi.cast('int', 2)
@@ -90,9 +94,9 @@ def _finalize(nfq, id, data, size, action, conn):
     if tinysnitch.dns.should_log(*conn):
         log(f'INFO {action} {tinysnitch.dns.format(*conn)}')
     if action == 'allow':
-        lib.nfq_set_verdict(nfq, id, ONE, ZERO, NULL)
+        lib.nfq_set_verdict(nfq, id, NF_ACCEPT, ZERO, NULL)
     elif action == 'deny':
-        lib.nfq_set_verdict2(nfq, id, ONE, MARK, size, data)
+        lib.nfq_set_verdict(nfq, id, NF_DROP, ZERO, NULL)
     else:
         assert False, f'bad action: {action}'
 
