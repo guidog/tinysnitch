@@ -49,8 +49,6 @@ def match_rule(src, dst, src_port, dst_port, proto):
     if proto not in tinysnitch.lib.protos:
         return 'allow', None, None # allow all non tcp/udp
     else:
-        if tinysnitch.dns.is_localhost(dst) and _ephemeral_port_low <= dst_port <= _ephemeral_port_high:
-            src, dst, src_port, dst_port = dst, src, dst_port, src_port # check return traffic on ephemeral ports as is it were outbound traffic
         dst_wildcard_subdomains = '*.' + '.'.join(dst.split('.')[-2:])
         keys = [
             (dst,                     dst_port, proto),
@@ -70,13 +68,18 @@ def match_rule(src, dst, src_port, dst_port, proto):
             ]
         for k in keys:
             try:
-                return state._rules[k]
+                matched = state._rules[k]
+                # log(f'matched rule: {k} {tinysnitch.dns.format(src, dst, src_port, dst_port, proto)}')
+                return matched
             except KeyError:
                 pass
 
 def check(finalize, conn):
     conn = tinysnitch.dns.resolve(*conn)
-    _src, dst, _src_port, dst_port, _proto = conn
+    src, dst, src_port, dst_port, proto = conn
+    if tinysnitch.dns.is_localhost(dst) and dst_port != '-' and _ephemeral_port_low <= dst_port <= _ephemeral_port_high:
+        src, dst, src_port, dst_port = dst, src, dst_port, src_port # check return traffic on ephemeral ports as is it were outbound traffic
+    conn = src, dst, src_port, dst_port, proto
     rule = match_rule(*conn)
     if rule:
         action, _duration, _start = rule
