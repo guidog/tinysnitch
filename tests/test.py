@@ -10,16 +10,19 @@ log_file = co('mktemp')
 os.environ['TINYSNITCH_RULES'] = rules_file
 
 def logs():
-    xs = co(f'cat {log_file} | grep -e "INFO allow" -e "INFO deny"').splitlines()
+    xs = co(f'cat {log_file} | grep -e "INFO allow" -e "INFO deny" || true').splitlines()
     xs = [x.split(' INFO ')[-1].replace('->', '').replace('|', ' ').split(None, 6) for x in xs]
     xs = [' '.join((action, proto, dst)) for action, proto, src, dst in xs]
-    return xs
+    return set(xs)
 
 def run(*rules):
     co('echo >', rules_file)
     for rule in rules:
         co('echo', rule, '>>', rules_file)
     cc(f'(sudo tinysnitchd --rules {rules_file} 2>&1 | tee {log_file}) &')
+
+def drop_localhost(xs):
+    return {x.replace('127.0.0.1', '').replace('localhost', '').replace('0.0.0.0', '') for x in xs}
 
 udp_client = """
 
@@ -66,59 +69,60 @@ def teardown_function():
 def test_outbound_allow():
     run('allow 1.1.1.1 53 udp',
         'allow google.com 80 tcp')
-    assert co('curl -v google.com 2>&1 | grep "^< HTTP"') == '< HTTP/1.1 301 Moved Permanently'
-    assert logs() == ['allow udp 1.1.1.1:53',
-                      'allow udp 1.1.1.1:53',
-                      'allow tcp google.com:80']
+    assert co('curl -s -m 10 -v google.com 2>&1 | grep "^< HTTP"') == '< HTTP/1.1 301 Moved Permanently'
+    assert logs() == {'allow udp 1.1.1.1:53',
+                      'allow tcp google.com:80'}
 
 def test_outbound_deny():
     run('deny 1.1.1.1 53 udp')
     with pytest.raises(subprocess.CalledProcessError):
-        cc('curl -v google.com')
-    assert logs() == ['deny udp 1.1.1.1:53',
-                      'deny udp 1.1.1.1:53']
+        cc('curl -s -m 10 -v google.com')
+    assert logs() == {'deny udp 1.1.1.1:53'}
 
 def test_outbound_deny_tcp():
     run('allow 1.1.1.1 53 udp',
         'deny google.com 80 tcp')
     with pytest.raises(subprocess.CalledProcessError):
-        cc('curl -v google.com')
-    assert logs() == ['allow udp 1.1.1.1:53',
-                      'allow udp 1.1.1.1:53',
-                      'deny tcp google.com:80']
+        cc('curl -s -m 10 -v google.com')
+    assert logs() == {'allow udp 1.1.1.1:53',
+                      'deny tcp google.com:80'}
 
 def test_inbound_allow():
-    run(f'allow localhost 8000 tcp')
-    proc = subprocess.Popen(f'cd $(mktemp -d) && echo bar > foo && python3 -m http.server', shell=True)
+    run('allow localhost 8000 tcp')
+    proc = subprocess.Popen('cd $(mktemp -d) && echo bar > foo && python3 -m http.server', shell=True)
     try:
-        assert co('curl localhost:8000/foo') == 'bar'
-        assert logs() == [f'allow tcp localhost:8000',
-                          f'allow tcp localhost:8000']
+        co('curl -s -m 10 localhost:8000/foo')
+        assert co('curl -s -m 10 localhost:8000/foo') == 'bar'
+        assert drop_localhost(logs()) == {'allow tcp :8000'}
     finally:
         proc.terminate()
 
 def test_inbound_deny_dst():
-    run(f'deny localhost 8000 tcp')
+    run('deny localhost 8000 tcp')
     proc = subprocess.Popen('cd $(mktemp -d) && echo bar > foo && python3 -m http.server', shell=True)
     try:
         with pytest.raises(subprocess.CalledProcessError):
-            cc('curl localhost:8000/foo')
-        assert logs() == [f'deny tcp localhost:8000']
+            cc('curl -s -m 10 localhost:8000/foo')
+        with pytest.raises(subprocess.CalledProcessError):
+            cc('curl -s -m 10 localhost:8000/foo')
+        assert drop_localhost(logs()) == {'deny tcp :8000'}
     finally:
         proc.terminate()
 
 def test_inbound_deny_src():
-    run(f'deny localhost 8000 tcp')
+    run('deny localhost 8000 tcp')
     proc = subprocess.Popen('cd $(mktemp -d) && echo bar > foo && python3 -m http.server', shell=True)
     try:
         with pytest.raises(subprocess.CalledProcessError):
-            cc('curl localhost:8000/foo')
-        assert logs() == [f'deny tcp localhost:8000']
+            cc('curl -s -m 10 localhost:8000/foo')
+        with pytest.raises(subprocess.CalledProcessError):
+            cc('curl -s -m 10 localhost:8000/foo')
+        assert drop_localhost(logs()) == {'deny tcp :8000'}
     finally:
         proc.terminate()
 
 def test_inbound_allow_udp():
-    run(f'allow localhost 1200 udp')
+    run('allow localhost 1200 udp')
     proc = subprocess.Popen('python3 /tmp/tinysnitch_test_udp_server.py 1200', shell=True)
     try:
         for _ in range(5):
@@ -127,13 +131,12 @@ def test_inbound_allow_udp():
                 break
             except:
                 pass
-        assert logs() == ['allow udp localhost:1200',
-                          'allow udp localhost:1200']
+        assert logs() == {'allow udp localhost:1200'}
     finally:
         proc.terminate()
 
 def test_inbound_deny_dst_udp():
-    run(f'deny localhost 1200 udp')
+    run('deny localhost 1200 udp')
     proc = subprocess.Popen('python3 /tmp/tinysnitch_test_udp_server.py 1200', shell=True)
     try:
         for _ in range(5):
@@ -142,12 +145,12 @@ def test_inbound_deny_dst_udp():
                 break
             except:
                 pass
-        assert logs() == ['deny udp localhost:1200'] * 3
+        assert logs() == {'deny udp localhost:1200'}
     finally:
         proc.terminate()
 
 def test_inbound_deny_src_udp():
-    run(f'deny localhost 1200 udp')
+    run('deny localhost 1200 udp')
     proc = subprocess.Popen('python3 /tmp/tinysnitch_test_udp_server.py 1200', shell=True)
     try:
         for _ in range(5):
@@ -156,6 +159,6 @@ def test_inbound_deny_src_udp():
                 break
             except:
                 pass
-        assert logs() == ['deny udp localhost:1200'] * 3
+        assert logs() == {'deny udp localhost:1200'}
     finally:
         proc.terminate()
