@@ -43,6 +43,8 @@ a split screen monitoring setup for a second monitor using [ptop](https://github
 
 setup nftables with `sudo nft -f nftables.conf`
 
+install with: `pypy3 -m pip install .`
+
 put `tinysnitch/bin` on your `$PATH`.
 
 ## usage
