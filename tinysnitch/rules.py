@@ -77,8 +77,13 @@ def match_rule(src, dst, src_port, dst_port, proto):
 def check(finalize, conn):
     conn = tinysnitch.dns.resolve(*conn)
     src, dst, src_port, dst_port, proto = conn
-    if tinysnitch.dns.is_localhost(dst) and dst_port != '-' and _ephemeral_port_low <= dst_port <= _ephemeral_port_high:
-        src, dst, src_port, dst_port = dst, src, dst_port, src_port # check return traffic on ephemeral ports as is it were outbound traffic
+    if (
+        not tinysnitch.dns.is_localhost(src)
+        and tinysnitch.dns.is_localhost(dst)
+        and dst_port != '-'
+        and _ephemeral_port_low <= dst_port <= _ephemeral_port_high
+    ):
+        src, dst, src_port, dst_port = dst, src, dst_port, src_port # check return inbound connections on ephemeral ports as if it were outbound traffic
     conn = src, dst, src_port, dst_port, proto
     rule = match_rule(*conn)
     if rule:

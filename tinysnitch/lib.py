@@ -28,6 +28,7 @@ import signal
 protos = {'tcp', 'udp'}
 
 def conn(packet):
+    # log(f'raw = {packet.src}:{packet["IP"].sport} -> {packet.dst}:{packet["IP"].dport} {packet.get_field("proto").i2s[packet.proto]}')
     src = packet.src
     dst = packet.dst
     src_port = dst_port = proto = '-'
