@@ -36,6 +36,7 @@ _ephemeral_port_low, _ephemeral_port_high = [int(port) for port in tinysnitch.li
 class state:
     rules_file = None
     temp_rules_file = None
+    adblock_rules_file = None
     _rules: Dict[Tuple[str, str, str], Tuple[str, str, Optional[int]]] = {}
     _prompt_queue: queue.Queue = queue.Queue(1024)
 
@@ -52,9 +53,9 @@ def match_rule(src, dst, src_port, dst_port, proto):
         dst_wildcard_subdomains = '*.' + '.'.join(dst.split('.')[-2:])
         keys = [
             (dst,                     dst_port, proto),
-            (dst,                     '-',      proto),
+            (dst,                     '*',      proto),
             (dst_wildcard_subdomains, dst_port, proto),
-            (dst_wildcard_subdomains, '-',      proto),
+            (dst_wildcard_subdomains, '*',      proto),
         ]
         if dst.replace('.', '').isdigit():
             a, b, c, d = dst.split('.')
@@ -62,9 +63,9 @@ def match_rule(src, dst, src_port, dst_port, proto):
                 (f'{a}.{b}.{c}.*', dst_port, proto),
                 (f'{a}.{b}.*.*',   dst_port, proto),
                 (f'{a}.*.*.*',     dst_port, proto),
-                (f'{a}.{b}.{c}.*', '-',      proto),
-                (f'{a}.{b}.*.*',   '-',      proto),
-                (f'{a}.*.*.*',     '-',      proto),
+                (f'{a}.{b}.{c}.*', '*',      proto),
+                (f'{a}.{b}.*.*',   '*',      proto),
+                (f'{a}.*.*.*',     '*',      proto),
             ]
         for k in keys:
             try:
@@ -80,7 +81,7 @@ def check(finalize, conn):
     if (
         not tinysnitch.dns.is_localhost(src)
         and tinysnitch.dns.is_localhost(dst)
-        and dst_port != '-'
+        and dst_port != '*'
         and _ephemeral_port_low <= dst_port <= _ephemeral_port_high
     ):
         src, dst, src_port, dst_port = dst, src, dst_port, src_port # check return inbound connections on ephemeral ports as if it were outbound traffic
@@ -117,7 +118,7 @@ def _parse_rule(line):
         log(f'ERROR invalid rule, should have been "action dst dst_port proto", was {line}\n{traceback.format_exc()}')
         return
     try:
-        if dst_port != '-':
+        if dst_port != '*':
             dst_port = int(dst_port)
     except ValueError:
         log(f'ERROR invalid rule {line}')
@@ -158,25 +159,31 @@ def _watch_temp_rules():
             os.remove(tempfile)
 
 def _watch_permanent_rules():
-    last = None
+    files = [state.rules_file, state.adblock_rules_file]
+    last = {}
+    for file in files:
+        last[file] = None
     while True:
-        try:
-            mtime = os.stat(state.rules_file).st_mtime
-        except FileNotFoundError:
-            mtime = 0
-        if last == mtime:
-            time.sleep(1)
-        else:
-            last = mtime
+        new_rules = set()
+        for file in files:
             try:
-                with open(state.rules_file) as f:
-                    lines = reversed(f.read().splitlines()) # lines at top of file are higher priority and overwrite later entries
+                mtime = os.stat(file).st_mtime
             except FileNotFoundError:
-                with open(state.rules_file, 'w') as f:
-                    lines = []
-            lines = [l.split('#')[-1] for l in lines]
-            lines = [l for l in lines if l.strip()]
-            new_rules = _upsert_permanent_rules(lines)
+                mtime = 0
+            if last[file] == mtime:
+                time.sleep(1)
+            else:
+                last[file] = mtime
+                try:
+                    with open(file) as f:
+                        lines = reversed(f.read().splitlines()) # lines at top of file are higher priority and overwrite later entries
+                except FileNotFoundError:
+                    with open(file, 'w') as f:
+                        lines = []
+                lines = [l.split('#')[-1] for l in lines]
+                lines = [l for l in lines if l.strip()]
+                new_rules = new_rules.union(_upsert_permanent_rules(lines))
+        if new_rules:
             _gc_permanent_rules(new_rules)
 
 def _gc_permanent_rules(new_rules):
@@ -238,7 +245,7 @@ def _process_prompt_queue():
 def _process_rule(conn, duration, subdomains, action, ports):
     _src, dst, _src_port, dst_port, proto = conn
     if ports == "no":
-        dst_port = '-'
+        dst_port = '*'
     if duration == 'once':
         return action
     else:

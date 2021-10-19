@@ -37,9 +37,10 @@ def _log_sizes():
     log('FATAL log sizes exited prematurely')
     sys.exit(1)
 
-def main(rules='/etc/tinysnitch.rules', temp_rules='/tmp/tinysnitch.temp'):
+def main(rules='/etc/tinysnitch.rules', temp_rules='/tmp/tinysnitch.temp', adblock_rules='/etc/tinysnitch.adblock'):
     tinysnitch.rules.state.rules_file = rules
     tinysnitch.rules.state.temp_rules_file = temp_rules
+    tinysnitch.rules.state.adblock_rules_file = adblock_rules
     if 'TINYSNITCH_LOG_SIZES' in os.environ:
         tinysnitch.lib.run_thread(_log_sizes)
     tinysnitch.dns.start()

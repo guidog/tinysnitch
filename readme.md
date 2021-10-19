@@ -59,4 +59,13 @@ or automatically run it with cron: `* * * * * sudo -E auto-restart tinysnitchd 2
 
 ## rules
 
-permanent rules are stored in `/etc/tinysnitch.rules`, and `tinysnitchd` will reload the rules when edited.
+permanent rules are stored in `/etc/tinysnitch.rules` and `/etc/tinysnitch.adlock`. edit those files and `tinysnitchd` will reload the rules.
+
+some example rules:
+
+```
+allow google.com             443 tcp
+deny  *.google-analytics.com *   tcp
+allow 172.17.*.*             *   tcp
+allow 172.17.*.*             *   udp
+```
