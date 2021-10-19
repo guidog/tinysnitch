@@ -22,6 +22,7 @@ import traceback
 import tinysnitch.lib
 import os
 import stat
+import subprocess
 import queue
 import sys
 import time
@@ -218,13 +219,13 @@ def _prompt(finalize, conn, prompt_conn):
     else:
         formatted = tinysnitch.dns.format(*prompt_conn)
         formatted = formatted.replace('$', '\$').replace('(', '\(').replace(')', '\)').replace('`', '\`')
-        output = tinysnitch.lib.check_output(f'su {_prompt_user} -c \'DISPLAY=:0 tinysnitch-prompt "{formatted}"\' 2>/tmp/tinysnitch_prompt.log')
         try:
+            output = tinysnitch.lib.check_output(f'su {_prompt_user} -c \'DISPLAY=:0 tinysnitch-prompt "{formatted}"\' 2>/tmp/tinysnitch_prompt.log')
             duration, subdomains, action, ports = output.split()
-        except ValueError:
+        except (ValueError, subprocess.CalledProcessError):
             log(f'output: {output}')
-            log('FATAL failed to run tinysnitch-prompt\n' + tinysnitch.lib.check_output('cat /tmp/tinysnitch_prompt.log || true'))
-            sys.exit(1)
+            log('ERROR failed to run tinysnitch-prompt\n' + tinysnitch.lib.check_output('cat /tmp/tinysnitch_prompt.log || true'))
+            return 'deny'
         else:
             action = _process_rule(conn, duration, subdomains, action, ports)
             if action == 'deny':
