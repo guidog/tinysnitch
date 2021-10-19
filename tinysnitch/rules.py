@@ -94,12 +94,13 @@ def check(finalize, conn):
     else:
         state._prompt_queue.put((finalize, conn))
 
-def _add_rule(action, duration, start, dst, dst_port, proto):
+def _add_rule(action, duration, start, dst, dst_port, proto, nolog=False):
     k = dst, dst_port, proto
     v = action, duration, start
     if state._rules.get(k) != v:
         state._rules[k] = v
-        log(f'INFO added rule {action} {dst} {dst_port} {proto}')
+        if not nolog:
+            log(f'INFO added rule {action} {dst} {dst_port} {proto}')
 
 def _gc_temporary_rules():
     while True:
@@ -171,21 +172,24 @@ def _watch_permanent_rules():
                 mtime = os.stat(file).st_mtime
             except FileNotFoundError:
                 mtime = 0
-            if last[file] == mtime:
-                time.sleep(1)
-            else:
+            if last[file] != mtime:
                 last[file] = mtime
-                try:
-                    with open(file) as f:
-                        lines = reversed(f.read().splitlines()) # lines at top of file are higher priority and overwrite later entries
-                except FileNotFoundError:
-                    with open(file, 'w') as f:
-                        lines = []
-                lines = [l.split('#')[-1] for l in lines]
-                lines = [l for l in lines if l.strip()]
-                new_rules = new_rules.union(_upsert_permanent_rules(lines))
-        if new_rules:
-            _gc_permanent_rules(new_rules)
+                break
+        else:
+            time.sleep(1)
+            continue
+
+        for file in files:
+            try:
+                with open(file) as f:
+                    lines = reversed(f.read().splitlines()) # lines at top of file are higher priority and overwrite later entries
+            except FileNotFoundError:
+                with open(file, 'w') as f:
+                    lines = []
+            lines = [l.split('#')[-1] for l in lines]
+            lines = [l for l in lines if l.strip()]
+            new_rules = new_rules.union(_upsert_permanent_rules(lines, file))
+        _gc_permanent_rules(new_rules)
 
 def _gc_permanent_rules(new_rules):
     for rule in list(state._rules):
@@ -195,14 +199,14 @@ def _gc_permanent_rules(new_rules):
             state._rules.pop(rule)
             log(f'INFO removed rule {action} {dst} {dst_port} {proto}')
 
-def _upsert_permanent_rules(lines):
+def _upsert_permanent_rules(lines, file):
     rules = set()
     for line in lines:
         rule = _parse_rule(line)
         if rule:
             action, dst, dst_port, proto = rule
             duration = start = None
-            _add_rule(action, duration, start, dst, dst_port, proto)
+            _add_rule(action, duration, start, dst, dst_port, proto, nolog=file == state.adblock_rules_file)
             rules.add((dst, dst_port, proto))
     return rules
 
