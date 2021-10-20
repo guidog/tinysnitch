@@ -80,10 +80,11 @@ def check(finalize, conn):
     conn = tinysnitch.dns.resolve(*conn)
     src, dst, src_port, dst_port, proto = conn
     if (
-        not tinysnitch.dns.is_localhost(src)
-        and tinysnitch.dns.is_localhost(dst)
+        tinysnitch.dns.is_localhost(dst)
+        and src_port != '*'
         and dst_port != '*'
         and _ephemeral_port_low <= dst_port <= _ephemeral_port_high
+        and src_port < _ephemeral_port_low
     ):
         src, dst, src_port, dst_port = dst, src, dst_port, src_port # check return inbound connections on ephemeral ports as if it were outbound traffic
     conn = src, dst, src_port, dst_port, proto
