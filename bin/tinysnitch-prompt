@@ -129,7 +129,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.title.setText('<p style="line-height: 50px;"><span style="font-weight: bold;">actions</span><br/>(y)es<br/>(n)o<br/><br/><span style="font-weight: bold;">granularity</span><br/>(d)omain-toggle<br/>(p)ort-toggle<br/><br/><span style="font-weight: bold;">duration</span><br/>(o)nce<br/>(1)minute<br/>(3)minutes<br/>(9)minutes<br/>(2)4hours<br/>(f)orever</p>') # noqa
         elif self.legend:
             text = '\n\n'.join(['protocol', ' '.join(['src:port', '->', 'dst:port'])])
-            text += f'\n\n[pid] program args'
+            text += '\n\n[pid] program args'
             self.title.setText(f'<span/>{text}\n\n{"-" * 250}\n\nduration subdomains\n\n(y)es (n)o (h)elp (l)egend\n\n{"-" * 250}\n\n{self.seconds} seconds until DENY'.replace('\n', '<br/>'))
         else:
             yellow = lambda x: '-' if x == '-' else f'<span style="color: rgb(220, 220, 0);">[{x}]</span>'
