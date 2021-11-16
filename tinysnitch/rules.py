@@ -21,7 +21,6 @@ from typing import Dict, Tuple, Optional
 import traceback
 import tinysnitch.lib
 import os
-import stat
 import subprocess
 import queue
 import sys
@@ -78,6 +77,8 @@ def match_rule(src, dst, src_port, dst_port, proto):
 
 def check(finalize, conn):
     conn = tinysnitch.dns.resolve(*conn)
+
+    # check inbound tcp connections on ephemeral ports as if it were outbound traffic
     src, dst, src_port, dst_port, proto = conn
     if (
         tinysnitch.dns.is_localhost(dst)
@@ -85,10 +86,21 @@ def check(finalize, conn):
         and dst_port != '*'
         and _ephemeral_port_low <= dst_port <= _ephemeral_port_high
         and src_port < _ephemeral_port_low
+        and proto == 'tcp'
     ):
-        src, dst, src_port, dst_port = dst, src, dst_port, src_port # check return inbound connections on ephemeral ports as if it were outbound traffic
+        src, dst, src_port, dst_port = dst, src, dst_port, src_port
     conn = src, dst, src_port, dst_port, proto
+
     rule = match_rule(*conn)
+
+    # udp should do a fallback check for inbound connections as if outbound
+    if not rule and proto == 'udp':
+        src, dst, src_port, dst_port = dst, src, dst_port, src_port
+        conn2 = src, dst, src_port, dst_port, proto
+        rule = match_rule(*conn2)
+        if rule:
+            conn = conn2
+
     if rule:
         action, _duration, _start = rule
         finalize(action, conn)
