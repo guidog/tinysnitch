@@ -69,7 +69,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.port = True
         self.action = 'no'
         self.meta = None
-        self.help = self.legend = False
+        self.help = False
+        self.legend = False
+        self.reverse = False
         self.text = ' '.join(words).replace('<', '&lt;').replace('>', '&gt;').split('|')
         self.seconds = 60
         self.timer = QtCore.QTimer()
@@ -118,6 +120,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.help = True
             elif key == 76: # l
                 self.legend = True
+            elif key == 82: # r
+                self.reverse = not self.reverse
+
         self.update()
 
     def finished(self, meta):
@@ -126,7 +131,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def update(self):
         if self.help:
-            self.title.setText('<p style="line-height: 50px;"><span style="font-weight: bold;">actions</span><br/>(y)es<br/>(n)o<br/><br/><span style="font-weight: bold;">granularity</span><br/>(d)omain-toggle<br/>(p)ort-toggle<br/><br/><span style="font-weight: bold;">duration</span><br/>(o)nce<br/>(1)minute<br/>(3)minutes<br/>(9)minutes<br/>(2)4hours<br/>(f)orever</p>') # noqa
+            self.title.setText('''
+                <p style="line-height: 50px;">
+                    <span style="font-weight: bold;">actions</span><br/>(y)es<br/>(n)o<br/><br/>
+                    <span style="font-weight: bold;">granularity</span><br/>(d)omain-toggle<br/>(p)ort-toggle<br/><br/>
+                    <span style="font-weight: bold;">duration</span><br/>(o)nce<br/>(1)minute<br/>(3)minutes<br/>(9)minutes<br/>(2)4hours<br/>(f)orever<br/><br/>
+                    <span style="font-weight: bold;">direction</span><br/>(r)reverse-src-dst<br/>
+                </p>
+            ''') # noqa
         elif self.legend:
             text = '\n\n'.join(['protocol', ' '.join(['src:port', '->', 'dst:port'])])
             text += '\n\n[pid] program args'
@@ -137,6 +149,9 @@ class MainWindow(QtWidgets.QMainWindow):
             src, arrow, dst = target.split()
             src_port = src.split(':')[-1]
             dst_port = dst.split(':')[-1]
+            if self.reverse:
+                src, dst = dst, src
+                src_port, dst_port = dst_port, src_port
             if self.meta is None:
                 self.thread = MetaThread(src_port, dst_port)
                 self.thread.signal.connect(self.finished)
@@ -167,7 +182,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.action = {'yes': 'allow', 'no': 'deny'}[self.action]
         subdomains = "yes" if self.subdomains else "no"
         ports = "yes" if self.port else "no"
-        print(f'{self.duration} {subdomains} {self.action} {ports}')
+        reverse = "yes" if self.reverse else "no"
+        print(f'{self.duration} {subdomains} {self.action} {ports} {reverse}')
         sys.exit(0)
 
 @argh.dispatch_command

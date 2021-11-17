@@ -96,10 +96,10 @@ def check(finalize, conn):
     # udp should do a fallback check for inbound connections as if outbound
     if not rule and proto == 'udp':
         src, dst, src_port, dst_port = dst, src, dst_port, src_port
-        conn2 = src, dst, src_port, dst_port, proto
-        rule = match_rule(*conn2)
+        conn = src, dst, src_port, dst_port, proto
+        rule = match_rule(*conn)
         if rule:
-            conn = conn2
+            conn = conn
 
     if rule:
         action, _duration, _start = rule
@@ -260,8 +260,10 @@ def _process_prompt_queue():
     log('FATAL process-prompt-queue exited prematurely')
     sys.exit(1)
 
-def _process_rule(conn, duration, subdomains, action, ports):
-    _src, dst, _src_port, dst_port, proto = conn
+def _process_rule(conn, duration, subdomains, action, ports, reverse):
+    src, dst, src_port, dst_port, proto = conn
+    if reverse == 'yes':
+        dst, dst_port = src, src_port
     if ports == "no":
         dst_port = '*'
     if duration == 'once':
