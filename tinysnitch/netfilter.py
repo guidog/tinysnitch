@@ -89,7 +89,7 @@ def destroy(nfq_q_handle, nfq_handle):
     if nfq_handle:
         assert lib.nfq_close(nfq_handle) == 0
 
-def _finalize(nfq, id, data, size, action, conn):
+def _finalize(nfq, id, action, conn):
     _src, _dst, _src_port, _dst_port, proto = conn
     if tinysnitch.dns.should_log(*conn):
         log(f'INFO {action} {tinysnitch.dns.format(*conn)}')
@@ -106,7 +106,7 @@ def _py_callback(id, data, size):
     packet = scapy.layers.inet.IP(unpacked)
     tinysnitch.dns.update_hosts(packet)
     conn = tinysnitch.lib.conn(packet)
-    finalize = lambda action, new_conn: _finalize(state._nfq_q_handle, id, data, size, action, new_conn)
+    finalize = lambda action, new_conn: _finalize(state._nfq_q_handle, id, action, new_conn)
 
     # auto accept dns responses; TODO map outbound ports to inbound ports instead of accepting anything from remote:udp:53
     if tinysnitch.dns.is_inbound_dns(*conn):
