@@ -75,7 +75,7 @@ def match_rule(src, dst, src_port, dst_port, proto):
             except KeyError:
                 pass
 
-def check(finalize, conn):
+def check(finalize, conn, on_miss):
     conn = tinysnitch.dns.resolve(*conn)
 
     # check inbound tcp connections on ephemeral ports as if it were outbound traffic
@@ -104,8 +104,10 @@ def check(finalize, conn):
     if rule:
         action, _duration, _start = rule
         finalize(action, conn)
+        return True
     else:
-        state._prompt_queue.put((finalize, conn))
+        on_miss(finalize, conn)
+        return False
 
 def _add_rule(action, duration, start, dst, dst_port, proto, nolog=False):
     k = dst, dst_port, proto
@@ -224,39 +226,30 @@ def _upsert_permanent_rules(lines, file):
     return rules
 
 def _prompt(finalize, conn, prompt_conn):
-    # we match rule again here in case a rule was added while this conn was waiting in the queue
-    rule = match_rule(*conn)
-    if rule:
-        action, _duration, _start = rule
+    formatted = tinysnitch.dns.format(*prompt_conn)
+    formatted = formatted.replace('$', '\$').replace('(', '\(').replace(')', '\)').replace('`', '\`')
+    try:
+        output = tinysnitch.lib.check_output(f'su {_prompt_user} -c \'DISPLAY=:0 tinysnitch-prompt "{formatted}"\' 2>/tmp/tinysnitch_prompt.log')
+        duration, subdomains, action, ports, reverse = output.split()
+    except (ValueError, subprocess.CalledProcessError):
+        log('ERROR failed to run tinysnitch-prompt\n' + tinysnitch.lib.check_output('cat /tmp/tinysnitch_prompt.log || true'))
+        return 'deny'
+    else:
+        action = _process_rule(conn, duration, subdomains, action, ports, reverse)
         if action == 'deny':
             finalize('deny', conn)
             return 'deny'
         else:
             return 'allow'
-    else:
-        formatted = tinysnitch.dns.format(*prompt_conn)
-        formatted = formatted.replace('$', '\$').replace('(', '\(').replace(')', '\)').replace('`', '\`')
-        try:
-            output = tinysnitch.lib.check_output(f'su {_prompt_user} -c \'DISPLAY=:0 tinysnitch-prompt "{formatted}"\' 2>/tmp/tinysnitch_prompt.log')
-            duration, subdomains, action, ports = output.split()
-        except (ValueError, subprocess.CalledProcessError):
-            log(f'output: {output}')
-            log('ERROR failed to run tinysnitch-prompt\n' + tinysnitch.lib.check_output('cat /tmp/tinysnitch_prompt.log || true'))
-            return 'deny'
-        else:
-            action = _process_rule(conn, duration, subdomains, action, ports)
-            if action == 'deny':
-                finalize('deny', conn)
-                return 'deny'
-            else:
-                return 'allow'
 
 def _process_prompt_queue():
     while True:
         finalize, conn = state._prompt_queue.get()
-        _src, dst, _src_port, dst_port, _proto = conn
-        action = _prompt(finalize, conn, conn)
-        finalize(action, conn)
+        # check again after pull from prompt-queue since rules can change while queued
+        if not check(finalize, conn, lambda *a: None):
+            _src, dst, _src_port, dst_port, _proto = conn
+            action = _prompt(finalize, conn, conn)
+            finalize(action, conn)
     log('FATAL process-prompt-queue exited prematurely')
     sys.exit(1)
 
