@@ -26,6 +26,7 @@ import queue
 import sys
 import time
 import uuid
+import base64
 from tinysnitch.lib import log
 
 assert '1' == tinysnitch.lib.check_output('ls /home | wc -l') or 'TINYSNITCH_PROMPT_USER' in os.environ, 'in a multi-user environment please specify the user to display X11 prompts as via env variable $TINYSNITCH_PROMPT_USER'
@@ -43,8 +44,8 @@ class state:
 def start():
     tinysnitch.lib.run_thread(_watch_temp_rules)
     tinysnitch.lib.run_thread(_watch_permanent_rules)
+    tinysnitch.lib.run_thread(_watch_prompt_queue)
     tinysnitch.lib.run_thread(_gc_temporary_rules)
-    tinysnitch.lib.run_thread(_process_prompt_queue)
 
 def match_rule(src, dst, src_port, dst_port, proto):
     if proto not in tinysnitch.lib.protos:
@@ -75,7 +76,7 @@ def match_rule(src, dst, src_port, dst_port, proto):
             except KeyError:
                 pass
 
-def check(finalize, conn, on_miss):
+def check(finalize, conn):
     conn = tinysnitch.dns.resolve(*conn)
 
     # check inbound tcp connections on ephemeral ports as if it were outbound traffic
@@ -98,15 +99,12 @@ def check(finalize, conn, on_miss):
         src, dst, src_port, dst_port = dst, src, dst_port, src_port
         conn = src, dst, src_port, dst_port, proto
         rule = match_rule(*conn)
-        if rule:
-            conn = conn
 
     if rule:
         action, _duration, _start = rule
         finalize(action, conn)
         return True
     else:
-        on_miss(finalize, conn)
         return False
 
 def _add_rule(action, duration, start, dst, dst_port, proto, nolog=False):
@@ -225,11 +223,11 @@ def _upsert_permanent_rules(lines, file):
             rules.add((dst, dst_port, proto))
     return rules
 
-def _prompt(finalize, conn, prompt_conn):
-    formatted = tinysnitch.dns.format(*prompt_conn)
-    formatted = formatted.replace('$', '\$').replace('(', '\(').replace(')', '\)').replace('`', '\`')
+def _prompt(finalize, conn):
+    formatted = tinysnitch.dns.format(*conn)
+    formatted = base64.b64encode(formatted.encode()).decode()
     try:
-        output = tinysnitch.lib.check_output(f'su {_prompt_user} -c \'DISPLAY=:0 tinysnitch-prompt "{formatted}"\' 2>/tmp/tinysnitch_prompt.log')
+        output = tinysnitch.lib.check_output(f'su {_prompt_user} -c "DISPLAY=:0 tinysnitch-prompt {formatted}" 2>/tmp/tinysnitch_prompt.log')
         duration, subdomains, action, ports, reverse = output.split()
     except (ValueError, subprocess.CalledProcessError):
         log('ERROR failed to run tinysnitch-prompt\n' + tinysnitch.lib.check_output('cat /tmp/tinysnitch_prompt.log || true'))
@@ -242,13 +240,13 @@ def _prompt(finalize, conn, prompt_conn):
         else:
             return 'allow'
 
-def _process_prompt_queue():
+def _watch_prompt_queue():
     while True:
         finalize, conn = state._prompt_queue.get()
         # check again after pull from prompt-queue since rules can change while queued
-        if not check(finalize, conn, lambda *a: None):
+        if not check(finalize, conn):
             _src, dst, _src_port, dst_port, _proto = conn
-            action = _prompt(finalize, conn, conn)
+            action = _prompt(finalize, conn)
             finalize(action, conn)
     log('FATAL process-prompt-queue exited prematurely')
     sys.exit(1)

@@ -118,5 +118,5 @@ def _py_callback(id, data, size):
 
     # run the firewall checks
     else:
-        on_miss = lambda finalize, conn: tinysnitch.rules.state._prompt_queue.put((finalize, conn))
-        tinysnitch.rules.check(finalize, conn, on_miss)
+        if not tinysnitch.rules.check(finalize, conn):
+            tinysnitch.rules.state._prompt_queue.put((finalize, conn))

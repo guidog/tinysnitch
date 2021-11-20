@@ -44,7 +44,7 @@ def start():
     tinysnitch.lib.run_thread(_dns_logger)
 
 def format(src, dst, src_port, dst_port, proto):
-    return f'{proto} | {src}:{src_port} -> {dst}:{dst_port}'
+    return f'{proto} {src}:{src_port} -> {dst}:{dst_port}'
 
 def should_log(*conn):
     return (
@@ -74,13 +74,11 @@ def is_localhost(addr):
     return addr in state._localhosts
 
 def update_hosts(packet):
-    addrs = []
     for name, addr in _parse_dns(packet):
         log(f'INFO dns {name} {addr}')
         if name != state._hosts.get(addr):
             state._dns_to_log.append((name, addr))
         state._hosts[addr] = name
-        addrs.append(addr)
 
 def resolve(src, dst, src_port, dst_port, proto):
     return get_hostname(src), get_hostname(dst), src_port, dst_port, proto
