@@ -1,5 +1,0 @@
-#!/usr/bin/env pypy3
-import tinysnitch
-import argh
-
-argh.dispatch_command(tinysnitch.main)

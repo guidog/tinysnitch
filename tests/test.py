@@ -1,16 +1,14 @@
 import subprocess
-import pytest
-import os
+import pytest # pip install pytest
 
 co = lambda *a: subprocess.check_output(' '.join(map(str, a)), shell=True, executable='/bin/bash').decode('utf-8').strip()
 cc = lambda *a: subprocess.check_call(' '.join(map(str, a)), shell=True, executable='/bin/bash')
 
 rules_file = co('mktemp')
 log_file = co('mktemp')
-os.environ['TINYSNITCH_RULES'] = rules_file
 
 def logs():
-    xs = co(f'cat {log_file} | grep -e "INFO allow" -e "INFO deny" || true').splitlines()
+    xs = co(f'cat {log_file} | grep -e "^allow" -e "^deny" || true').splitlines()
     xs = [x.split(' INFO ')[-1].replace('->', '').replace('|', ' ').split(None, 6) for x in xs]
     xs = [' '.join((action, proto, dst)) for action, proto, src, dst in xs]
     return set(xs)
@@ -19,7 +17,8 @@ def run(*rules):
     co('echo >', rules_file)
     for rule in rules:
         co('echo', rule, '>>', rules_file)
-    cc(f'(sudo tinysnitchd --rules {rules_file} 2>&1 | tee {log_file}) &')
+    teardown_function()
+    cc(f'(/usr/bin/sudo tinysnitch -r {rules_file} -a /dev/null -t /dev/null 2>&1 | tee {log_file}) &')
 
 def drop_localhost(xs):
     return {x.replace('127.0.0.1', '').replace('localhost', '').replace('0.0.0.0', '') for x in xs}
@@ -53,18 +52,15 @@ while True:
 """
 
 def setup_module():
-    assert co('sudo whoami') == 'root'
+    assert co('/usr/bin/sudo whoami') == 'root'
     with open('/tmp/tinysnitch_test_udp_client.py', 'w') as f:
         f.write(udp_client)
     with open('/tmp/tinysnitch_test_udp_server.py', 'w') as f:
         f.write(udp_server)
 
-def setup_function():
-    assert co('ps -ef | grep tinysnitch | grep -v -e test -e grep | wc -l') == '0', 'fatal: tinysnitch is not running'
-
 def teardown_function():
-    pids = [x.split()[1] for x in co('ps -ef|grep tinysnitch').splitlines()]
-    cc('sudo kill', *pids, '&>/dev/null || true')
+    pids = [x.split()[1] for x in co('ps -ef|grep tinysnitch|grep -v test').splitlines()]
+    cc('/usr/bin/sudo kill', *pids, '&>/dev/null || true')
 
 def test_outbound_allow():
     run('allow 1.1.1.1 53 udp',

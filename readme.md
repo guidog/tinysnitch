@@ -30,8 +30,8 @@ a split screen monitoring setup for a second monitor using [ptop](https://github
 
  there are two components with separate dependencies:
 
- - tinysnitchd:
-   - [pypy3](https://pypy.org/)
+ - tinysnitch:
+   - [go](https://archlinux.org/packages/community/x86_64/go/)
    - [libnetfilter_queue](https://www.archlinux.org/packages/extra/x86_64/libnetfilter_queue/)
    - [nftables](https://archlinux.org/packages/extra/x86_64/nftables/)
 
@@ -43,23 +43,23 @@ a split screen monitoring setup for a second monitor using [ptop](https://github
 
 setup nftables with `sudo nft -f nftables.conf`
 
-install with: `pypy3 -m pip install .`
+build with: `make`
 
-put `tinysnitch/bin` on your `$PATH`.
+put `tinysnitch/` on your `$PATH`.
 
 ## usage
 
-tinysnitchd must be launched with sudo as a user process, so the subprocess pyqt5 prompts can actually show up on your screen.
+tinysnitch must be launched with sudo as a user process, so the subprocess pyqt5 prompts can actually show up on your screen.
 
-either run it in a background terminal: `sudo -E tinysnitchd`
+either run it in a background terminal: `sudo -E tinysnitch`
 
-or automatically run it with cron: `* * * * * sudo -E auto-restart tinysnitchd 2>&1 | rotate-logs /tmp/tinynitchd.log`
+or automatically run it with cron: `* * * * * sudo -E auto-restart tinysnitch 2>&1 | rotate-logs /tmp/tinynitch.log`
 
-[auto-restart](https://gist.github.com/nathants/dc5d43c1e57b9bbb3a654491df93e4d6) and [rotate-logs](https://gist.github.com/nathants/72968aaa7d9ab7c008fe32e399426d2c) are not convenient, not required.
+[auto-restart](https://gist.github.com/nathants/dc5d43c1e57b9bbb3a654491df93e4d6) and [rotate-logs](https://gist.github.com/nathants/72968aaa7d9ab7c008fe32e399426d2c) are not required, just convenient.
 
 ## rules
 
-permanent rules are stored in `/etc/tinysnitch.rules` and `/etc/tinysnitch.adlock`. edit those files and `tinysnitchd` will reload the rules.
+permanent rules are stored in `/etc/tinysnitch.rules` and `/etc/tinysnitch.adlock`. edit those files and `tinysnitch` will reload the rules.
 
 some example rules:
 
