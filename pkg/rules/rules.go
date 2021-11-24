@@ -497,7 +497,7 @@ func processPromptOutput(p *packet.Packet, output string) {
 	r.Address = p.Dst
 	r.Port = p.DstPort
 	r.Proto = p.Proto
-	addRule(r, false)
+	addRule(r, true)
 	if duration == "forever" {
 		persistRule(r)
 	}
