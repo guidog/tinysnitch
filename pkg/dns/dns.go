@@ -56,6 +56,7 @@ func UpdateHosts(d *DNS) {
 		state.hosts[d.Address] = d.Name
 		state.lock.Unlock()
 		state.newDNS <- d
+		fmt.Printf("dns %s -> %s\n", d.Name, d.Address)
 	} else {
 		state.lock.Unlock()
 	}
@@ -135,7 +136,6 @@ func dnsLogger() {
 		for {
 			select {
 			case d := <-state.newDNS:
-				fmt.Printf("dns %s -> %s\n", d.Name, d.Address)
 				_, err = f.WriteString(d.String() + "\n")
 				if err != nil {
 					panic(err)
