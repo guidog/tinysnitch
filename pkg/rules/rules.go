@@ -251,9 +251,12 @@ func check(p *packet.Packet) bool {
 		p.FlipDirection()
 	}
 	rule := matchRule(p)
-	if rule == nil && p.Proto == packet.ProtoUDP { // udp should do a fallback check for inbound connections as if outbound
+	if (rule == nil || rule.Action == packet.ActionAccept) && p.Proto == packet.ProtoUDP { // udp should do a fallback check with directions flipped, and prefer packet.ActionDrop
 		p.FlipDirection()
-		rule = matchRule(p)
+		rule2 := matchRule(p)
+		if rule2 != nil {
+			rule = rule2
+		}
 	}
 	if rule != nil {
 		switch rule.Action {
