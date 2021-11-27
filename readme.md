@@ -49,23 +49,38 @@ put `tinysnitch/` on your `$PATH`.
 
 ## usage
 
-tinysnitch must be launched with sudo as a user process, so the subprocess pyqt5 prompts can actually show up on your screen.
+tinysnitch should be launched with `sudo -E`, so the qt5 prompt can use your DISPLAY.
 
 either run it in a background terminal: `sudo -E tinysnitch`
 
 or automatically run it with cron: `* * * * * sudo -E auto-restart tinysnitch 2>&1 | rotate-logs /tmp/tinynitch.log`
 
-[auto-restart](https://gist.github.com/nathants/dc5d43c1e57b9bbb3a654491df93e4d6) and [rotate-logs](https://gist.github.com/nathants/72968aaa7d9ab7c008fe32e399426d2c) are not required, just convenient.
+[auto-restart](https://gist.github.com/nathants/dc5d43c1e57b9bbb3a654491df93e4d6) and [rotate-logs](https://gist.github.com/nathants/72968aaa7d9ab7c008fe32e399426d2c) are not required.
 
 ## rules
 
-permanent rules are stored in `/etc/tinysnitch.rules` and `/etc/tinysnitch.adlock`. edit those files and `tinysnitch` will reload the rules.
+permanent rules are stored in `/etc/tinysnitch.rules` and `/etc/tinysnitch.adblock`. edit those files and `tinysnitch` will reload.
 
 some example rules:
+
+`action address port proto`
 
 ```
 allow google.com             443 tcp
 deny  *.google-analytics.com *   tcp
 allow 172.17.*.*             *   tcp
 allow 172.17.*.*             *   udp
+```
+
+temporary rules can be added by appending lines to `/tmp/tinysnitch.temp`, which will be loaded and then truncated.
+
+some example temporary rules:
+
+`action duration address port proto`
+
+```
+allow 1-hour   google.com             443 tcp
+deny  9-minute *.google-analytics.com *   tcp
+allow 24-hour  172.17.*.*             *   tcp
+allow 1-minute 172.17.*.*             *   udp
 ```
