@@ -40,7 +40,7 @@ type dnsState struct {
 var state = &dnsState{
 	localhosts: make(map[string]interface{}),
 	hosts:      make(map[string]string),
-	newDNS:     make(chan *DNS, 1024),
+	newDNS:     make(chan *DNS, 4096),
 	lock:       sync.RWMutex{},
 }
 

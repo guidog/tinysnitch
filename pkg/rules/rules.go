@@ -161,7 +161,7 @@ type rulesState struct {
 var state = &rulesState{
 	lock:        sync.RWMutex{},
 	rules:       make(map[RuleKey]*Rule),
-	promptQueue: make(chan *packet.Packet, 1024),
+	promptQueue: make(chan *packet.Packet, 4096),
 }
 
 func Start(rulesFile, tempRulesFile, adblockRulesFile string) {
