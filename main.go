@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 
 	"github.com/nathants/tinysnitch/pkg/dns"
 	"github.com/nathants/tinysnitch/pkg/netfilter"
@@ -21,7 +20,5 @@ func main() {
 
 	nfqHandle, nfqQHandle := netfilter.Create(rules.Process)
 	nfqFd := netfilter.Setup(nfqHandle, nfqQHandle)
-
-	fmt.Println("startup")
 	netfilter.Run(nfqHandle, nfqFd)
 }
