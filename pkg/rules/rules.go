@@ -255,7 +255,9 @@ func check(p *packet.Packet) bool {
 		p.FlipDirection()
 		rule2 := matchRule(p)
 		if rule2 != nil {
-			rule = rule2
+			rule = rule2 // match, use rule2
+		} else {
+			p.FlipDirection() // no match, flip back
 		}
 	}
 	if rule != nil {
