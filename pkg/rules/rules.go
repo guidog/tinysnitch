@@ -439,7 +439,7 @@ func prompt(p *packet.Packet) {
 		netfilter.Finalize(p.Id, packet.ActionDrop)
 		return
 	}
-	processPromptOutput(p, stdout.String())
+	processPromptOutput(p, strings.TrimRight(stdout.String(), "\n"))
 }
 
 func processPromptOutput(p *packet.Packet, output string) {
