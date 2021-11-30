@@ -26,7 +26,9 @@ const (
 type Packet struct {
 	Proto   string
 	Src     string
+	SrcIP   string
 	Dst     string
+	DstIP   string
 	SrcPort string
 	DstPort string
 	Id      int
@@ -43,15 +45,15 @@ func (p *Packet) IsICMP() bool {
 }
 
 func (p *Packet) IsInboundDNS() bool {
-	return dns.IsLocalhost(p.Dst) && p.SrcPort == "53"
+	return dns.IsLocalhost(p.DstIP) && p.SrcPort == "53"
 }
 
 func (p *Packet) IsOutboundDNS() bool {
-	return dns.IsLocalhost(p.Src) && p.DstPort == "53"
+	return dns.IsLocalhost(p.SrcIP) && p.DstPort == "53"
 }
 
 func (p *Packet) IsLocalTraffic() bool {
-	return dns.IsLocalhost(p.Src) && dns.IsLocalhost(p.Dst)
+	return dns.IsLocalhost(p.SrcIP) && dns.IsLocalhost(p.DstIP)
 }
 
 func (p *Packet) IsUDPLooopback() bool {
@@ -105,8 +107,10 @@ func Parse(id int, data []byte) *Packet {
 	p := &Packet{
 		Proto:   "*",
 		Src:     ipv4.SrcIP.String(),
+		SrcIP:   ipv4.SrcIP.String(),
 		SrcPort: "*",
 		Dst:     ipv4.DstIP.String(),
+		DstIP:   ipv4.DstIP.String(),
 		DstPort: "*",
 		Id:      id,
 	}

@@ -79,8 +79,8 @@ some example temporary rules:
 `action duration address port proto`
 
 ```
-allow 1-hour   google.com             443 tcp
-deny  9-minute *.google-analytics.com *   tcp
-allow 24-hour  172.17.*.*             *   tcp
-allow 1-minute 172.17.*.*             *   udp
+1-hour   allow google.com             443 tcp
+9-minute deny  *.google-analytics.com *   tcp
+24-hour  allow 172.17.*.*             *   tcp
+1-minute allow 172.17.*.*             *   udp
 ```

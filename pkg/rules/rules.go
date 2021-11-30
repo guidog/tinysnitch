@@ -237,7 +237,7 @@ func atoi(s string) int {
 }
 
 func shouldFlipEphemeralTCP(p *packet.Packet) bool {
-	return dns.IsLocalhost(p.Dst) &&
+	return dns.IsLocalhost(p.DstIP) &&
 		p.Proto == packet.ProtoTCP &&
 		p.SrcPort != "*" &&
 		p.DstPort != "*" &&
