@@ -546,10 +546,17 @@ func watchPromptQueue() {
 }
 
 func Process(id int, data []byte) {
+
 	p := packet.Parse(id, data)
 
 	// already dropped
 	if p.Id == -1 {
+		return
+	}
+
+	// allow all icmp
+	if p.IsICMP() {
+		netfilter.Finalize(p.Id, packet.ActionAccept)
 		return
 	}
 
