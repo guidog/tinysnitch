@@ -53,7 +53,7 @@ func Start() {
 func UpdateHosts(d *DNS) {
 	state.lock.Lock()
 	if d.Name != state.hosts[d.Address] {
-		state.hosts[d.Address] = d.Name
+		state.hosts[d.Address] = strings.ToLower(d.Name)
 		state.lock.Unlock()
 		state.newDNS <- d
 		fmt.Printf("dns %s -> %s\n", d.Name, d.Address)
@@ -114,7 +114,7 @@ func populateHosts() {
 		dns := DNS{}
 		dns.Parse(line)
 		state.lock.Lock()
-		state.hosts[dns.Address] = dns.Name
+		state.hosts[dns.Address] = strings.ToLower(dns.Name)
 		state.lock.Unlock()
 	}
 }
