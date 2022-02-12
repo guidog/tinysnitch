@@ -342,11 +342,8 @@ func watchTempRules() {
 					}
 				}
 			}
-			err = os.Remove(tempFile)
-			if err != nil {
-				panic(err)
-			}
 		}
+		_ = os.Remove(tempFile)
 	}
 }
 
