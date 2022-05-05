@@ -63,6 +63,7 @@ func UpdateHosts(d *DNS) {
 }
 
 func localhostWatcher() {
+	// defer func() {}()
 	for {
 		ifaces, err := net.Interfaces()
 		if err != nil {
@@ -127,6 +128,7 @@ func IsLocalhost(address string) bool {
 }
 
 func dnsLogger() {
+	// defer func() {}()
 	for {
 		f, err := os.OpenFile(dnsFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {

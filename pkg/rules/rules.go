@@ -292,6 +292,7 @@ func addRule(r *Rule, log bool) {
 }
 
 func gcTemporaryRules() {
+	// defer func() {}()
 	for {
 		state.lock.RLock()
 		var rules []*Rule
@@ -312,6 +313,7 @@ func gcTemporaryRules() {
 }
 
 func watchTempRules() {
+	// defer func() {}()
 	for {
 		f, err := ioutil.TempFile("/tmp", "temprule.")
 		if err != nil {
@@ -348,6 +350,7 @@ func watchTempRules() {
 }
 
 func watchPermanentRules() {
+	// defer func() {}()
 	state.lock.RLock()
 	rulesFile := state.rulesFile
 	adblockRulesFile := state.adblockRulesFile
@@ -533,6 +536,7 @@ func persistRule(r *Rule) {
 }
 
 func watchPromptQueue() {
+	// defer func() {}()
 	for {
 		p := <-state.promptQueue
 		if !check(p) { // check again after pull from prompt-queue since rules can change while queued
