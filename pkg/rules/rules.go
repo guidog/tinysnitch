@@ -340,6 +340,7 @@ func watchTempRules() {
 					if err != nil {
 						fmt.Println(err)
 					} else {
+						fmt.Println("add-temp-rule-from-file", r.Duration, r)
 						addRule(r, false)
 					}
 				}
