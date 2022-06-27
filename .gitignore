@@ -3,7 +3,6 @@ tinysnitch
 todo.yml
 bpf-test
 *.pyc
-*.c
 *.so
 *.o
 build
