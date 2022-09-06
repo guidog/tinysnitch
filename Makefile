@@ -1,11 +1,11 @@
-.PHONY: test tinysnitch check check-static check-ineff check-err check-vet test-lib check-bodyclose check-nargs check-fmt check-hasdefault check-hasdefer
+.PHONY: test tinysnitch check check-static check-ineff check-err check-vet test-lib check-bodyclose check-nargs check-fmt check-hasdefault check-hasdefer check-govulncheck
 
 all: tinysnitch
 
 tinysnitch:
 	go build
 
-check: check-deps check-static check-ineff check-err check-vet check-lint check-bodyclose check-nargs check-fmt check-hasdefault check-hasdefer
+check: check-deps check-static check-ineff check-err check-vet check-lint check-bodyclose check-nargs check-fmt check-hasdefault check-hasdefer check-govulncheck
 
 check-deps:
 	@which staticcheck >/dev/null   || (cd ~ && go install honnef.co/go/tools/cmd/staticcheck@latest)
@@ -16,6 +16,10 @@ check-deps:
 	@which nargs       >/dev/null   || (cd ~ && go install github.com/alexkohler/nargs/cmd/nargs@latest)
 	@which go-hasdefault >/dev/null || (cd ~ && go install github.com/nathants/go-hasdefault@latest)
 	@which go-hasdefer >/dev/null   || (cd ~ && go install github.com/nathants/go-hasdefer@latest)
+	@which govulncheck >/dev/null   || (cd ~ && go install golang.org/x/vuln/cmd/govulncheck@latest)
+
+check-govulncheck: check-deps
+	@govulncheck ./...
 
 check-hasdefault: check-deps
 	@go-hasdefault $(shell find -type f -name "*.go") || true

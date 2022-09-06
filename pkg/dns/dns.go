@@ -2,7 +2,6 @@ package dns
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"strings"
@@ -100,7 +99,7 @@ func GetHostName(address string) string {
 }
 
 func populateHosts() {
-	data, err := ioutil.ReadFile(dnsFile)
+	data, err := os.ReadFile(dnsFile)
 	if err != nil {
 		f, err := os.Create(dnsFile)
 		if err == nil {

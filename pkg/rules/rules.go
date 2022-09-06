@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"regexp"
@@ -43,7 +42,7 @@ func username() string {
 }
 
 func ephemeralPorts() (int, int) {
-	data, err := ioutil.ReadFile("/proc/sys/net/ipv4/ip_local_port_range")
+	data, err := os.ReadFile("/proc/sys/net/ipv4/ip_local_port_range")
 	if err != nil {
 		panic(err)
 	}
@@ -315,7 +314,7 @@ func gcTemporaryRules() {
 func watchTempRules() {
 	// defer func() {}()
 	for {
-		f, err := ioutil.TempFile("/tmp", "temprule.")
+		f, err := os.CreateTemp("/tmp", "temprule.")
 		if err != nil {
 			panic(err)
 		}
@@ -329,7 +328,7 @@ func watchTempRules() {
 		if err != nil {
 			time.Sleep(1 * time.Second)
 		} else {
-			data, err := ioutil.ReadFile(tempFile)
+			data, err := os.ReadFile(tempFile)
 			if err != nil {
 				panic(err)
 			}
@@ -382,7 +381,7 @@ func watchPermanentRules() {
 		newRules := make(map[RuleKey]*Rule)
 		for _, file := range files {
 			count := 0
-			data, err := ioutil.ReadFile(file)
+			data, err := os.ReadFile(file)
 			if err != nil {
 				fmt.Println("err-on-readfile", file, err)
 				continue
