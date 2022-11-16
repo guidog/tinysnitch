@@ -1,4 +1,4 @@
-module github.com/nathants/tinysnitch
+module github.com/nathants/tiny-snitch
 
 go 1.17
 

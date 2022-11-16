@@ -1,8 +1,8 @@
-.PHONY: test tinysnitch check check-static check-ineff check-err check-vet test-lib check-bodyclose check-nargs check-fmt check-hasdefault check-hasdefer check-govulncheck
+.PHONY: test tiny-snitch check check-static check-ineff check-err check-vet test-lib check-bodyclose check-nargs check-fmt check-hasdefault check-hasdefer check-govulncheck
 
-all: tinysnitch
+all: tiny-snitch
 
-tinysnitch:
+tiny-snitch:
 	go build
 
 check: check-deps check-static check-ineff check-err check-vet check-lint check-bodyclose check-nargs check-fmt check-hasdefault check-hasdefer check-govulncheck

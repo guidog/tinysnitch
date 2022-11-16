@@ -18,7 +18,7 @@ def run(*rules):
     for rule in rules:
         co('echo', rule, '>>', rules_file)
     teardown_function()
-    cc(f'(/usr/bin/sudo tinysnitch -r {rules_file} -a /dev/null -t /dev/null 2>&1 | tee {log_file}) &')
+    cc(f'(/usr/bin/sudo tiny-snitch -r {rules_file} -a /dev/null -t /dev/null 2>&1 | tee {log_file}) &')
 
 def drop_localhost(xs):
     return {x.replace('127.0.0.1', '').replace('localhost', '').replace('0.0.0.0', '') for x in xs}
@@ -53,13 +53,13 @@ while True:
 
 def setup_module():
     assert co('/usr/bin/sudo whoami') == 'root'
-    with open('/tmp/tinysnitch_test_udp_client.py', 'w') as f:
+    with open('/tmp/tiny-snitch_test_udp_client.py', 'w') as f:
         f.write(udp_client)
-    with open('/tmp/tinysnitch_test_udp_server.py', 'w') as f:
+    with open('/tmp/tiny-snitch_test_udp_server.py', 'w') as f:
         f.write(udp_server)
 
 def teardown_function():
-    pids = [x.split()[1] for x in co('ps -ef|grep tinysnitch|grep -v test').splitlines()]
+    pids = [x.split()[1] for x in co('ps -ef|grep tiny-snitch|grep -v test').splitlines()]
     cc('/usr/bin/sudo kill', *pids, '&>/dev/null || true')
 
 def test_outbound_allow():
@@ -119,11 +119,11 @@ def test_inbound_deny_src():
 
 def test_inbound_allow_udp():
     run('allow localhost 1200 udp')
-    proc = subprocess.Popen('python3 /tmp/tinysnitch_test_udp_server.py 1200', shell=True)
+    proc = subprocess.Popen('python3 /tmp/tiny-snitch_test_udp_server.py 1200', shell=True)
     try:
         for _ in range(5):
             try:
-                assert co('timeout 1 python3 /tmp/tinysnitch_test_udp_client.py ping 0.0.0.0:1200') == 'pong'
+                assert co('timeout 1 python3 /tmp/tiny-snitch_test_udp_client.py ping 0.0.0.0:1200') == 'pong'
                 break
             except:
                 pass
@@ -133,11 +133,11 @@ def test_inbound_allow_udp():
 
 def test_inbound_deny_dst_udp():
     run('deny localhost 1200 udp')
-    proc = subprocess.Popen('python3 /tmp/tinysnitch_test_udp_server.py 1200', shell=True)
+    proc = subprocess.Popen('python3 /tmp/tiny-snitch_test_udp_server.py 1200', shell=True)
     try:
         for _ in range(5):
             try:
-                assert co('timeout 1 python3 /tmp/tinysnitch_test_udp_client.py ping 0.0.0.0:1200') == 'pong'
+                assert co('timeout 1 python3 /tmp/tiny-snitch_test_udp_client.py ping 0.0.0.0:1200') == 'pong'
                 break
             except:
                 pass
@@ -147,11 +147,11 @@ def test_inbound_deny_dst_udp():
 
 def test_inbound_deny_src_udp():
     run('deny localhost 1200 udp')
-    proc = subprocess.Popen('python3 /tmp/tinysnitch_test_udp_server.py 1200', shell=True)
+    proc = subprocess.Popen('python3 /tmp/tiny-snitch_test_udp_server.py 1200', shell=True)
     try:
         for _ in range(5):
             try:
-                assert co('timeout 1 python3 /tmp/tinysnitch_test_udp_client.py ping 0.0.0.0:1200') == 'pong'
+                assert co('timeout 1 python3 /tmp/tiny-snitch_test_udp_client.py ping 0.0.0.0:1200') == 'pong'
                 break
             except:
                 pass

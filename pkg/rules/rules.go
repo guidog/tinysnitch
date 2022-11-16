@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nathants/tinysnitch/pkg/dns"
-	"github.com/nathants/tinysnitch/pkg/netfilter"
-	"github.com/nathants/tinysnitch/pkg/packet"
+	"github.com/nathants/tiny-snitch/pkg/dns"
+	"github.com/nathants/tiny-snitch/pkg/netfilter"
+	"github.com/nathants/tiny-snitch/pkg/packet"
 )
 
 const (
@@ -428,7 +428,7 @@ func gcPermanentRules(newRules map[RuleKey]*Rule) {
 
 func prompt(p *packet.Packet) {
 	input := base64.StdEncoding.EncodeToString([]byte(p.String()))
-	cmd := exec.Command("su", promptUser, "-c", fmt.Sprintf("DISPLAY=:0 tinysnitch-prompt %s", input))
+	cmd := exec.Command("su", promptUser, "-c", fmt.Sprintf("DISPLAY=:0 tiny-snitch-prompt %s", input))
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout

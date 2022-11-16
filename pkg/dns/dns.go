@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	dnsFile = "/etc/tinysnitch.hosts"
+	dnsFile = "/etc/tiny-snitch.hosts"
 )
 
 type DNS struct {

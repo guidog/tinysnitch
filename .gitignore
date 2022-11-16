@@ -1,5 +1,5 @@
 bpftrace
-tinysnitch
+tiny-snitch
 todo.yml
 bpf-test
 *.pyc

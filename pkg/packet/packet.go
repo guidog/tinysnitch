@@ -5,8 +5,8 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/nathants/tinysnitch/pkg/dns"
-	"github.com/nathants/tinysnitch/pkg/netfilter"
+	"github.com/nathants/tiny-snitch/pkg/dns"
+	"github.com/nathants/tiny-snitch/pkg/netfilter"
 )
 
 var decodeOptions = gopacket.DecodeOptions{

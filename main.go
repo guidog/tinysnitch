@@ -3,16 +3,16 @@ package main
 import (
 	"flag"
 
-	"github.com/nathants/tinysnitch/pkg/dns"
-	"github.com/nathants/tinysnitch/pkg/netfilter"
-	"github.com/nathants/tinysnitch/pkg/rules"
+	"github.com/nathants/tiny-snitch/pkg/dns"
+	"github.com/nathants/tiny-snitch/pkg/netfilter"
+	"github.com/nathants/tiny-snitch/pkg/rules"
 )
 
 func main() {
 
-	rulesFile := flag.String("r", "/etc/tinysnitch.rules", "permanent rules file")
-	tempRulesFile := flag.String("t", "/tmp/tinysnitch.temp", "temp rules file")
-	adblockRulesFile := flag.String("a", "/etc/tinysnitch.adblock", "adblock rules file")
+	rulesFile := flag.String("r", "/etc/tiny-snitch.rules", "permanent rules file")
+	tempRulesFile := flag.String("t", "/tmp/tiny-snitch.temp", "temp rules file")
+	adblockRulesFile := flag.String("a", "/etc/tiny-snitch.adblock", "adblock rules file")
 	flag.Parse()
 
 	dns.Start()
